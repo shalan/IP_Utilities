@@ -1,6 +1,6 @@
 /*
-	Copyright 2020 AUCOHL
-
+	Copyright (C) 2020 AUCOHL
+    
     Author: Mohamed Shalan (mshalan@aucegypt.edu)
 	
 	Licensed under the Apache License, Version 2.0 (the "License"); 
@@ -16,7 +16,7 @@
 	limitations under the License.
 */
 
-task wb_master_word_wr(input [31:0] addr, input [31:0] data);
+task WB_W_WRITE(input [31:0] addr, input [31:0] data);
     begin : task_body
         @(posedge clk_i);
         #1;
@@ -33,7 +33,7 @@ task wb_master_word_wr(input [31:0] addr, input [31:0] data);
     end
 endtask
 
-task wb_master_word_rd(input [31:0] addr, output [31:0] data);
+task WB_W_READ(input [31:0] addr, output [31:0] data);
     begin : task_body
         @(posedge clk_i);
         #1;
