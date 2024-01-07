@@ -74,7 +74,7 @@ module aucohl_ticker #(parameter W=8) (
 
     reg [W-1:0] counter;
     wire        counter_is_zero = (counter == 'b0);
-    always @(posedge clk, or negedge rst_n)
+    always @(posedge clk, negedge rst_n)
         if(rst_n)
             counter <=  'b0;
         else if(counter_is_zero)
