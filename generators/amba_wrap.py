@@ -21,7 +21,7 @@
 """
 
 import sys
-import os.path
+#import os.path
 import yaml
 
 IP          = None
@@ -45,8 +45,7 @@ def print_header(bus_type):
     print(f"`timescale\t\t\t1ns/1ps")
     print(f"`default_nettype\t\tnone\n")
     print(f"`define\t\t\t\t{bus_type}_AW\t\t\t{BUS_AW}\n")
-    print(f"`include\t\t\t\"{bus_type.lower()}_wrapper.vh\"\n")
-    
+    print(f"`include\t\t\t\"{bus_type.lower()}_wrapper.vh\"\n")    
 def print_license():
     print(f"/*\n\tCopyright {IP['info']['date'].split('-')[2]} {IP['info']['owner']}\n")
     print(f"\tAuthor: {IP['info']['author']} ({IP['info']['email']})\n")
@@ -121,7 +120,13 @@ def print_module_header(bus_type):
         None
     """
     # Print module name
-    print(f"module {bus_type}_{IP['info']['name']} (")
+    print(f"module {IP['info']['name']}_{bus_type} #( \n\tparameter\t")
+
+    for index, p in enumerate(IP['parameters']):
+        print(f"\t\t\t\t{p['name']} = {p['default']}", end="")
+        if index != len(IP['parameters']) - 1:
+            print(",")
+    print("\n)(")
 
     if IP["external_interface"]:
         # Print {bus_type}_SLAVE_PORTS
@@ -164,7 +169,7 @@ def print_wires(bus_type):
     print(f"\twire\t\t{IP['clock']['name']} = {clk_net};")
 
     # Check if reset is active and set the 'mod' variable accordingly
-    if IP['reset']['active'] == 0:
+    if IP['reset']['level'] == 0:
         mod = "~"
     else:
         mod = ""
@@ -177,7 +182,7 @@ def print_wires(bus_type):
 
     # Print wire declarations for the IP instance ports
     for i in IP['ports']:
-        print(f"\twire [{i['width']-1}:0]\t{i['name']};")
+        print(f"\twire [{i['width']}-1:0]\t{i['name']};")
 
     print("")
 
@@ -203,7 +208,12 @@ def print_instance_to_wrap():
     Returns:
         None
     """
-    print(f"\t{IP['info']['name']} instance_to_wrap (")
+    print(f"\t{IP['info']['name']} #(")
+    for index, p in enumerate(IP['parameters']):
+        print(f"\t\t.{p['name']}({p['name']})", end="")
+        if index != len(IP['parameters']) - 1:
+            print(",")
+    print("\n\t) instance_to_wrap (")
     print(f"\t\t.{IP['clock']['name']}({IP['clock']['name']}),")
     print(f"\t\t.{IP['reset']['name']}({IP['reset']['name']}),")
     for index, p in enumerate(IP['ports']):
@@ -226,18 +236,41 @@ def print_registers(bus_type):
     """
     for r in IP['registers']:
         if r['mode'] == 'rw':
+            # 'rw' registers cannot have field
             print(f"\treg\t[{r['size']-1}:0]\t{r['name']}_REG;")
             print(f"\twire\t[{r['size']-1}:0]\t{r['name']}_WIRE;")
             print(f"\tassign\t{r['name']}_WIRE = {r['read_port']};")
             print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
             print(f"\t`{bus_type}_REG({r['name']}_REG, 0, 8)")
         elif r['mode'] == 'w':
-            print(f"\treg [{r['size']-1}:0]\t{r['name']}_REG;")
-            print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
-            print(f"\t`{bus_type}_REG({r['name']}_REG, 0, 8)")
+            print(f"\treg [{r['size']}-1:0]\t{r['name']}_REG;")
+            if "fields" in r:
+                for f in r['fields']:
+                    if isinstance(f['bit_width'], int):
+                        to = f['bit_width'] + f['bit_offset'] - 1
+                    else:
+                        if f['bit_offset'] == 0:
+                            to = f"({f['bit_width']} - 1)"
+                        else:
+                            to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
+                    print(f"\tassign\t{f['write_port']}\t=\t{r['name']}_REG[{to} : {f['bit_offset']}];")
+            else:
+                print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
+            print(f"\t`{bus_type}_REG({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']})")
         elif r['mode'] == 'r':
-            print(f"\twire [{r['size']-1}:0]\t{r['name']}_WIRE;")
-            print(f"\tassign\t{r['name']}_WIRE = {r['read_port']};")
+            print(f"\twire [{r['size']}-1:0]\t{r['name']}_WIRE;")
+            if "fields" in r:
+                for f in r['fields']:
+                    if isinstance(f['bit_width'], int):
+                        to = f['bit_width'] + f['bit_offset'] - 1
+                    else:
+                        if f['bit_offset'] == 0:
+                            to = f"({f['bit_width']} - 1)"
+                        else:
+                            to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
+                    print(f"\tassign\t{r['name']}_WIRE[{to} : {f['bit_offset']}] = {f['read_port']};")
+            else:
+                print(f"\tassign\t{r['name']}_WIRE = {r['read_port']};")
         print()
         
 def get_port_width(port):
@@ -253,6 +286,12 @@ def get_port_width(port):
     for p in IP['ports']:
         if p['name'] == port:
             return p['width']
+    return -1
+
+def get_param_default(param):
+    for p in IP['parameters']:
+        if p['name'] == param:
+            return p['default']
     return -1
 
 def print_ris_register(bus_type):
@@ -335,10 +374,10 @@ def print_registers_offsets(bus_type):
         print(f"\tlocalparam\t{r['name']}_REG_OFFSET = `{bus_type}_AW'd{r['offset']};")
 
     # Interrupt registers
-    print(f"\tlocalparam\tIM_REG_OFFSET = {bus_type}_AW'd{IM_OFF};")
-    print(f"\tlocalparam\tMIS_REG_OFFSET = {bus_type}_AW'd{MIS_OFF};")
-    print(f"\tlocalparam\tRIS_REG_OFFSET = {bus_type}_AW'd{RIS_OFF};")
-    print(f"\tlocalparam\tIC_REG_OFFSET = {bus_type}_AW'd{IC_OFF};")
+    print(f"\tlocalparam\tIM_REG_OFFSET = `{bus_type}_AW'd{IM_OFF};")
+    print(f"\tlocalparam\tMIS_REG_OFFSET = `{bus_type}_AW'd{MIS_OFF};")
+    print(f"\tlocalparam\tRIS_REG_OFFSET = `{bus_type}_AW'd{RIS_OFF};")
+    print(f"\tlocalparam\tIC_REG_OFFSET = `{bus_type}_AW'd{IC_OFF};")
                 
     print("")
 
@@ -351,13 +390,13 @@ def print_rdata(bus_type):
     print(f"\tassign\t{prefix}RDATA = ")
     for index,r in enumerate(IP['registers']):
         if "r" in r['mode']:
-            print(f"\t\t\t({prefix}ADDR[{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
+            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
         else:
-            print(f"\t\t\t({prefix}ADDR[{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_REG :")
+            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_REG :")
     
     if "flags" in IP:
         for r in IRQ_REGS:
-            print(f"\t\t\t({prefix}ADDR[{bus_type}_AW-1:0] == {r}_REG_OFFSET)\t? {r}_REG :")
+            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r}_REG_OFFSET)\t? {r}_REG :")
     
     print("\t\t\t32'hDEADBEEF;")
     
@@ -376,7 +415,7 @@ def print_bus_wrapper(bus_type):
         print("endmodule")
 
 def print_tb_duv(bus_type):
-    print(f"\n\t{IP['info']['name']} DUV (")
+    print(f"\n\t{IP['info']['name']}_{bus_type} DUV (")
     print(f"\t\t`TB_{bus_type}_SLAVE_CONN", end="")
     if IP["external_interface"]:
         print(",")
@@ -397,7 +436,6 @@ def print_tb_reg_offsets(bus_type):
     print(f"\t\t\tRIS_REG_OFFSET =\t`{bus_type}_AW'h"  +"{0:04x}".format(RIS_OFF)+",")
     print(f"\t\t\tMIS_REG_OFFSET =\t`{bus_type}_AW'h"  +"{0:04x}".format(MIS_OFF)+";\n")
 
-
 def print_tb(bus_type):
     print_license()
     print(f"/* THIS FILE IS GENERATED, edit it to complete the testbench */\n")
@@ -407,7 +445,7 @@ def print_tb(bus_type):
     print("`define\t\t\tMS_TB_SIMTIME\t\t1_000_000\n")
     print(f"`include\t\t\"tb_macros.vh\"\n")
 
-    print(f"module {bus_type}_{IP['info']['name']}_tb;\n")
+    print(f"module {IP['info']['name']}_{bus_type}_tb;\n")
 
     print("\t// Change the following parameters as desired")
     print("\tparameter real CLOCK_PERIOD = 100.0;")
@@ -430,18 +468,19 @@ def print_tb(bus_type):
     print(f"\n\t`TB_CLK({'HCLK' if bus_type == 'AHB' else 'PCLK'}, CLOCK_PERIOD)")
     #print(f"\t`TB_SRSTN({'HRESETn' if bus_type == 'AHB' else 'PRESETn'}, {'HCLK' if bus_type == 'AHB' else 'PCLK'}, RESET_DURATION)")
     print(f"\t`TB_ESRST({'HRESETn' if bus_type == 'AHB' else 'PRESETn'}, 1'b0, {'HCLK' if bus_type == 'AHB' else 'PCLK'}, RESET_DURATION)")
-    print(f"\t`TB_DUMP(\"{bus_type}_{IP['info']['name']}_tb.vcd\", {bus_type}_{IP['info']['name']}_tb, 0)")
+    print(f"\t`TB_DUMP(\"{bus_type}_{IP['info']['name']}_tb.vcd\", {IP['info']['name']}_{bus_type}_tb, 0)")
     print(f"\t`TB_FINISH(`MS_TB_SIMTIME)")
 
     print_tb_duv(bus_type)
 
     print(f"\n\t`include \"{bus_type.lower()}_tasks.vh\"\n")
 
+    print("\tevent\te_test1_start, e_test1_done;")
     print("\tinitial begin\n"
           "\t\t#999 -> e_assert_reset;\n"
           "\t\t@(e_reset_done);\n\n"
           "\t\t// Perform Test 1\n"
-          "\t\t#1000 -> e_start_test1;\n"
+          "\t\t#1000 -> e_test1_start;\n"
           "\t\t@(e_test1_done);\n\n"
           "\t\t// Perform other tests\n\n"
           "\t\t// Finish the simulation\n"
@@ -449,7 +488,7 @@ def print_tb(bus_type):
           "\tend\n\n")
         
     print("\t// Test 1\n"
-          "\tintial begin\n"
+          "\tinitial begin\n"
           "\t\t@(e_test1_start);\n"
           "\n\t\t// Test 1 code goes here\n"
           "\n\t\t@(e_test1_done);\n"
@@ -473,9 +512,13 @@ def print_reg_def():
     for r in IP["registers"]:
         if "fields" in r:
             for f in r["fields"]:
-                if int(f['size']) != 32:
-                    print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}\t\t{f['from']}")
-                    print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_LEN\t{f['size']}")
+                if not isinstance(f['bit_width'], int):
+                    width = get_param_default(f['bit_width'])
+                else:
+                    width = f['bit_width']
+                print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_BIT\t{f['bit_offset']}")
+                mask = hex((2**width - 1) << f['bit_offset'])
+                print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_MASK\t{mask}")
 
     print()    
     # add Int Registers fields
@@ -507,9 +550,7 @@ def print_reg_def():
     print("\t__R \tmis;")
     print("}", end="")
     print(f" {ip_name}_TYPE;")
-            
     print("\n#endif\n")
-
 
 def print_help():
     print(f"Usage: {sys.argv[0]} -apb|-ahb -tb|-ch ip.yml instance_name") 
@@ -548,8 +589,8 @@ def main():
     with open(args[0], "r") as stream:
         try:
             IP=yaml.safe_load(stream)
-        except yaml.YAMLError:
-            raise sys.exit("Error loading the YAML file! Please check the file for syntax errors")
+        except Exception:
+            raise sys.exit("Error loading the YAML file! Please check the file for syntax errors; you may use yamllint for this.")
 
     if "-tb" in opts:
         print_tb(bus_type)
