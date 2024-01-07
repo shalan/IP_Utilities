@@ -26,7 +26,7 @@
                                         else if(apb_we & (PADDR[`APB_AW-1:0]==``name``_OFFSET))\ 
                                             name <= PWDATA[``size``-1:0];
 
-`define		APB_IC_REG(size)			`APB_BLOCK(ICR_REG, ``size``'b0)\
+`define		APB_IC_REG(size)			`APB_BLOCK(IC_REG, ``size``'b0)\
                                         else if(apb_we & (PADDR[`APB_AW-1:0]==IC_REG_OFFSET))\ 
                                             IC_REG <= PWDATA[``size``-1:0];\ 
                                         else \
