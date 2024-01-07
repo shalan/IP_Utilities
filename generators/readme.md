@@ -1,15 +1,20 @@
-# IP Wrapper generator for AMBA APB and AHB Lite
 
-## Usage
+## IP Wrapper generator for AMBA APB and AHB Lite
+
 ``amba_wrap.py -apb|-ahb -tb|-ch ip.yml``
 - Options:
-    - -apb : generate APB wrapper
-    - -ahb : generate AHB wrapper
-    - -tb  : generate a Verilog testbench for the generated bus wrapper
-    - -ch  : generate a C header file containing the register definitions
+    - `-apb` : generate APB wrapper
+    - `-ahb` : generate AHB wrapper
+    - `-tb` : generate a Verilog testbench for the generated bus wrapper
+    - `-ch` : generate a C header file containing the register definitions
 - Arguments:
-    - ip.yml: A YAML file that contains the IP definition
-## IP Definition File
+    - `ip.yml`: A YAML file that contains the IP definition
+
+## YAML Template Generator
+
+``v2yaml.py verilog_file module_name``
+
+## YAML IP Definition File Format
 
 A YAML file is used to capture the IP information. This includes:
 ### info
