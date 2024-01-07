@@ -55,3 +55,4 @@ tmp.v
 *.vcd
 *.vvp
 *.o
+tmp.*
