@@ -217,10 +217,16 @@ def print_instance_to_wrap():
     print(f"\t\t.{IP['clock']['name']}({IP['clock']['name']}),")
     print(f"\t\t.{IP['reset']['name']}({IP['reset']['name']}),")
     for index, p in enumerate(IP['ports']):
-        if index != len(IP['ports']) - 1:
+        if index != len(IP['ports']) - 1 or "external_interface" in IP:
             print(f"\t\t.{p['name']}({p['name']}),")
         else:
             print(f"\t\t.{p['name']}({p['name']})")
+    if "external_interface" in IP:
+        for index, ifc in enumerate(IP['external_interface']):
+            if index != len(IP['external_interface']) - 1:
+                print(f"\t\t.{ifc['name']}({ifc['name']}),")
+            else:
+                print(f"\t\t.{ifc['name']}({ifc['name']})")
     print("\t);\n")
 
 
@@ -526,7 +532,11 @@ def print_reg_def():
         c = 0;
         #fcnt = len(self.ip.data["flags"])
         for flag in IP["flags"]:
-            width = get_port_width(flag["port"])
+            w = get_port_width(flag["port"])
+            if isinstance(w, int):
+                width = w
+            else:
+                width = get_param_default(w)
             pattern = (2**width - 1) << c
             print(f"#define {ip_name}_{flag['name'].upper()}_FLAG\t{hex(pattern)}")
             c = c + width
@@ -552,8 +562,75 @@ def print_reg_def():
     print(f" {ip_name}_TYPE;")
     print("\n#endif\n")
 
+def print_bf():
+    for r in IP["registers"]:
+        print(f"\n{r['name']}.json")
+        print("{reg:[")
+        if not "fields" in r:
+            if isinstance(r["size"], int):
+                size = int(r["size"])
+            else:
+                size = get_param_default(r["size"])
+            print(f"\t{{name:\"{r['name']}\", bits:{size}}},")
+            print(f"\t{{bits: {32-size}}}")
+        else:
+            l = 0
+            for f in r["fields"]:
+                if isinstance(f["bit_width"], int):
+                    size = int(f["bit_width"])
+                else:
+                    size = get_param_default(f["bit_width"])
+                l = l + size
+                print(f"\t{{name:\"{f['name']}\", bits:{size}}},")
+            print(f"\t{{bits: {32-r['size']}}}")
+        print("], config: {hspace: width, lanes: 2, hflip: true}}")
+
+def print_md_table():
+    print("\n## Registers\n")
+    print("|register name|offset|size|mode|description|")
+    print("|---|---|---|---|---|")
+    for r in IP["registers"]:
+        if isinstance(r["size"], int):
+            size = int(r["size"])
+        else:
+            size = get_param_default(r["size"])
+        print("|{0}|{1}|{2}|{3}|{4}|".format(r["name"], hex(r["offset"])[2:].zfill(4), size, r["mode"], r["description"]))
+    if "flags" in IP:
+        print("|{0}|{1}|{2}|{3}|{4}|".format("IM", hex(IM_OFF)[2:].zfill(4), len(IP['flags']), "w", "Interrupt Mask Register; check the flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("RIS", hex(RIS_OFF)[2:].zfill(4), len(IP['flags']), "w", "Raw Interrupt Status; check the flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("MIS", hex(MIS_OFF)[2:].zfill(4), len(IP['flags']), "w", "Masked Interrupt Status; check the flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("IC", hex(IC_OFF)[2:].zfill(4), len(IP['flags']), "w", "Interrupt Clear Register; check the flags table for more details"))
+
+    for r in IP["registers"]:
+        print(f"\n### {r['description']} [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
+        print(f"\n{r['description']}")
+        if "fields" in r:
+            print("\n|bit|field name|width|description|")
+            print("|---|---|---|---|")
+            for f in r["fields"]:
+                if isinstance(f["bit_width"], int):
+                    width = int(f["bit_width"])
+                else:
+                    width = get_param_default(f["bit_width"])
+                print("|{0}|{1}|{2}|{3}|".format(f["bit_offset"], f["name"], width, f["description"]))
+
+    if "flags" in IP:
+        c = 0;
+        print("\n## Interrupt Flags\n")
+        print("|bit|flag|width|")
+        print("|---|---|---|")
+        for flag in IP["flags"]:
+            width = get_port_width(flag["port"])
+            if isinstance(width, int):
+                w = width
+            else:
+                w = get_param_default(width)
+            print(f"|{c}|{flag['name'].upper()}|{w}|")
+            c += w
+            
+        
 def print_help():
-    print(f"Usage: {sys.argv[0]} -apb|-ahb -tb|-ch ip.yml instance_name") 
+    print(f"Usage: {sys.argv[0]} -apb|-ahb -tb|-ch|-md ip.yml instance_name") 
     print("Options:")
     print("\t-apb : generate APB wrapper")
     print("\t-ahb : generate AHB wrapper")
@@ -564,7 +641,7 @@ def print_help():
 
 def exit_with_message(msg):
     print(msg)
-    sys.exit(f"Usage: {sys.argv[0]} -apb|-ahb|-tb|-ch ip.yml instance_name")    
+    sys.exit(f"Usage: {sys.argv[0]} -apb|-ahb -tb|-ch|-md ip.yml instance_name")    
 
 def main():
     global IP
@@ -596,6 +673,9 @@ def main():
         print_tb(bus_type)
     elif "-ch" in opts:
         print_reg_def()
+    elif "-md" in opts:
+        print_md_table()
+        print_bf()
     else:
         print_bus_wrapper(bus_type)
     
