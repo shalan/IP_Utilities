@@ -16,9 +16,9 @@
 	limitations under the License.
 */
 
-`define		AHB_BLOCK(name, init)		always @(posedge HCLK or negedge HRESETn) if(~HRESETn) name <= init;
+`define		AHBL_BLOCK(name, init)		always @(posedge HCLK or negedge HRESETn) if(~HRESETn) name <= init;
 
-`define     APB_CTRL_SIGNALS            reg  last_HSEL, last_HWRITE; reg [31:0] last_HADDR; reg [1:0] last_HTRANS;\
+`define     AHBL_CTRL_SIGNALS            reg  last_HSEL, last_HWRITE; reg [31:0] last_HADDR; reg [1:0] last_HTRANS;\
                                         always@ (posedge HCLK) begin \
                                             if(HREADY) begin\
                                                 last_HSEL       <= HSEL;\
@@ -31,16 +31,16 @@
 	                                    wire	ahbl_we	= last_HWRITE & ahbl_valid;\
 	                                    wire	ahbl_re	= ~last_HWRITE & ahbl_valid;
 
-`define		AHB_REG(name, init, size)	`AHB_BLOCK(name, init)\
+`define		AHBL_REG(name, init, size)	`AHB_BLOCK(name, init)\
                                         else if(ahbl_we & (last_HADDR[`AHB_AW-1:0]==``name``_OFFSET)) \
                                             name <= HWDATA[``size``-1:0];
 
-`define		AHB_IC_REG(size)			`AHB_BLOCK(IC_REG, ``size``'b0)\ 
+`define		AHBL_IC_REG(size)			`AHB_BLOCK(IC_REG, ``size``'b0)\ 
                                         else if(ahbl_we & (last_HADDR[`AHB_AW-1:0]==IC_REG_OFFSET)) \
                                             IC_REG <= HWDATA[``size``-1:0]; \
                                         else IC_REG <= ``size``'d0;
 
-`define     AHB_SLAVE_PORTS             input wire          HCLK,\
+`define     AHBL_SLAVE_PORTS             input wire          HCLK,\
                                         input wire          HRESETn,\
                                         input wire          HWRITE,\
                                         input wire [31:0]   HWDATA,\
@@ -52,4 +52,4 @@
                                         output wire [31:0]  HRDATA,\
                                         output wire         IRQ\
 
-`define     AHB_MIS_REG(size)           wire[size-1:0]      MIS_REG	= RIS_REG & IM_REG;
+`define     AHBL_MIS_REG(size)          wire[size-1:0]      MIS_REG	= RIS_REG & IM_REG;
