@@ -170,9 +170,9 @@ def print_wires(bus_type):
 
     # Check if reset is active and set the 'mod' variable accordingly
     if IP['reset']['level'] == 0:
-        mod = "~"
-    else:
         mod = ""
+    else:
+        mod = "~"
 
     # Print reset wire declaration
     print(f"\twire\t\t{IP['reset']['name']} = {mod}{rst_net};\n")
@@ -240,43 +240,47 @@ def print_registers(bus_type):
     Returns:
         None
     """
-    for r in IP['registers']:
-        if r['mode'] == 'rw':
-            # 'rw' registers cannot have field
-            print(f"\treg\t[{r['size']-1}:0]\t{r['name']}_REG;")
-            print(f"\twire\t[{r['size']-1}:0]\t{r['name']}_WIRE;")
-            print(f"\tassign\t{r['name']}_WIRE = {r['read_port']};")
-            print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
-            print(f"\t`{bus_type}_REG({r['name']}_REG, 0, 8)")
-        elif r['mode'] == 'w':
-            print(f"\treg [{r['size']}-1:0]\t{r['name']}_REG;")
-            if "fields" in r:
-                for f in r['fields']:
-                    if isinstance(f['bit_width'], int):
-                        to = f['bit_width'] + f['bit_offset'] - 1
-                    else:
-                        if f['bit_offset'] == 0:
-                            to = f"({f['bit_width']} - 1)"
-                        else:
-                            to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
-                    print(f"\tassign\t{f['write_port']}\t=\t{r['name']}_REG[{to} : {f['bit_offset']}];")
-            else:
-                print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
-            print(f"\t`{bus_type}_REG({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']})")
-        elif r['mode'] == 'r':
-            print(f"\twire [{r['size']}-1:0]\t{r['name']}_WIRE;")
-            if "fields" in r:
-                for f in r['fields']:
-                    if isinstance(f['bit_width'], int):
-                        to = f['bit_width'] + f['bit_offset'] - 1
-                    else:
-                        if f['bit_offset'] == 0:
-                            to = f"({f['bit_width']} - 1)"
-                        else:
-                            to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
-                    print(f"\tassign\t{r['name']}_WIRE[{to} : {f['bit_offset']}] = {f['read_port']};")
-            else:
+    for r in IP['registers']:     
+        if r['fifo'] is True:
+            print(f"\twire\t[{r['size']}-1:0]\t{r['name']}_WIRE;")
+        else:
+            if r['mode'] == 'rw':
+                # 'rw' registers cannot have field
+                print(f"\treg\t[{r['size']}-1:0]\t{r['name']}_REG;")
+                print(f"\twire\t[{r['size']}-1:0]\t{r['name']}_WIRE;")
                 print(f"\tassign\t{r['name']}_WIRE = {r['read_port']};")
+                print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
+                print(f"\t`{bus_type}_REG({r['name']}_REG, 0, 8)")
+            elif r['mode'] == 'w':
+                print(f"\treg [{r['size']}-1:0]\t{r['name']}_REG;")
+                if "fields" in r:
+                    for f in r['fields']:
+                        if isinstance(f['bit_width'], int):
+                            to = f['bit_width'] + f['bit_offset'] - 1
+                        else:
+                            if f['bit_offset'] == 0:
+                                to = f"({f['bit_width']} - 1)"
+                            else:
+                                to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
+                        print(f"\tassign\t{f['write_port']}\t=\t{r['name']}_REG[{to} : {f['bit_offset']}];")
+                else:
+                    print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
+                print(f"\t`{bus_type}_REG({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']})")
+            elif r['mode'] == 'r':
+                print(f"\twire [{r['size']}-1:0]\t{r['name']}_WIRE;")
+                if "fields" in r:
+                    for f in r['fields']:
+                        if isinstance(f['bit_width'], int):
+                            to = f['bit_width'] + f['bit_offset'] - 1
+                        else:
+                            if f['bit_offset'] == 0:
+                                to = f"({f['bit_width']} - 1)"
+                            else:
+                                to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
+                        print(f"\tassign\t{r['name']}_WIRE[{to} : {f['bit_offset']}] = {f['read_port']};")
+                else:
+                    print(f"\tassign\t{r['name']}_WIRE = {r['read_port']};")
+        
         print()
         
 def get_port_width(port):
@@ -322,16 +326,19 @@ def print_ris_register(bus_type):
     print(f"\t`{bus_type}_BLOCK(RIS_REG, 0) else begin")
 
     # Iterate over each flag in the IP dictionary
+    pos = 0
     for f in IP['flags']:
 
         # Iterate from 0 to the port width of the flag
-        print(f"\t\tfor(_i_ = 0; _i_ < {get_port_width(f['port'])}; _i_ = _i_ + 1) begin")
+        print(f"\t\tfor(_i_ = {pos}; _i_ < {get_port_width(f['port'])+pos}; _i_ = _i_ + 1) begin")
 
         # Update RIS_REG based on the condition
-        print(f"\t\t\tif(IC_REG) RIS_REG[_i_] <= 1'b1; else if({f['name']}[_i_] == 1'b1) RIS_REG[_i_] <= 1'b1;")
+        print(f"\t\t\tif(IC_REG[_i_]) RIS_REG[_i_] <= 1'b0; else if({f['name']}[_i_ - {pos}] == 1'b1) RIS_REG[_i_] <= 1'b1;")
 
         # End the inner loop
         print("\t\tend")
+
+        pos += get_port_width(f['port'])
 
     # End the outer loop
     print("\tend")
@@ -389,13 +396,13 @@ def print_registers_offsets(bus_type):
 
 def print_rdata(bus_type):
     IRQ_REGS = ["IM", "MIS", "RIS", "IC"]
-    prefix = "H"
+    prefix = "last_H"
     if bus_type == "APB":
         prefix = "P"
     
     print(f"\tassign\t{prefix}RDATA = ")
     for index,r in enumerate(IP['registers']):
-        if "r" in r['mode']:
+        if "r" in r['mode'] or r['fifo'] is True:
             print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
         else:
             print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_REG :")
@@ -408,6 +415,24 @@ def print_rdata(bus_type):
     
     print(f"\n\tassign {prefix}READY = 1'b1;\n")
 
+def print_fifos(bus_type):
+    if "fifos" in IP:
+        prefix = "last_H"
+        data = "HWDATA"
+        if bus_type == "APB":
+            prefix = "P"
+            data = "PWDATA"
+    
+        for f in IP["fifos"]:
+            rd = f"({bus_type.lower()}_re & ({prefix}ADDR[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            wr = f"({bus_type.lower()}_we & ({prefix}ADDR[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            if f['type'] == "write":
+                print(f"\tassign\t{f['data_port']} = {data};") #{f['register']}_WIRE;")
+                print(f"\tassign\t{f['control_port']} = {wr};")
+            else:
+                print(f"\tassign\t{f['register']}_WIRE = {f['data_port']};")
+                print(f"\tassign\t{f['control_port']} = {rd};")
+
 def print_bus_wrapper(bus_type):
         print_license()
         print_header(bus_type)
@@ -418,6 +443,7 @@ def print_bus_wrapper(bus_type):
         print_IRQ_registers(bus_type)
         print_instance_to_wrap()
         print_rdata(bus_type)
+        print_fifos(bus_type)
         print("endmodule")
 
 def print_tb_duv(bus_type):
@@ -436,7 +462,7 @@ def print_tb_duv(bus_type):
 def print_tb_reg_offsets(bus_type):
     print(f"\tlocalparam [`{bus_type}_AW-1:0]")
     for i, r in enumerate(IP['registers']):
-        print(f"\t\t\t{r['name'].upper()}_REG_OFFSET =\t`{bus_type}_AW'h"+"{0:04x}".format(i*4)+",")
+        print(f"\t\t\t{r['name'].upper()}_REG_OFFSET =\t`{bus_type}_AW'h"+"{0:04x}".format(r['offset'])+",")
     print(f"\t\t\tIM_REG_OFFSET =\t\t`{bus_type}_AW'h" +"{0:04x}".format(IM_OFF)+",")
     print(f"\t\t\tIC_REG_OFFSET =\t\t`{bus_type}_AW'h" +"{0:04x}".format(IC_OFF)+",")
     print(f"\t\t\tRIS_REG_OFFSET =\t`{bus_type}_AW'h"  +"{0:04x}".format(RIS_OFF)+",")
@@ -494,11 +520,9 @@ def print_tb(bus_type):
           "\tend\n\n")
         
     print("\t// Test 1\n"
-          "\tinitial begin\n"
-          "\t\t@(e_test1_start);\n"
+          "\t`TB_TEST_BEGIN(test1)"
           "\n\t\t// Test 1 code goes here\n"
-          "\n\t\t@(e_test1_done);\n"
-          "\tend\n")
+          "\n\t`TB_TEST_END(test1)")
 
     print("endmodule")
 
