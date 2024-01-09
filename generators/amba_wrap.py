@@ -23,6 +23,7 @@
 import sys
 #import os.path
 import yaml
+import json
 
 IP          = None
 
@@ -654,7 +655,7 @@ def print_md_table():
             
         
 def print_help():
-    print(f"Usage: {sys.argv[0]} -apb|-ahb -tb|-ch|-md ip.yml instance_name") 
+    print(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahb -tb|-ch|-md") 
     print("Options:")
     print("\t-apb : generate APB wrapper")
     print("\t-ahb : generate AHB wrapper")
@@ -665,7 +666,7 @@ def print_help():
 
 def exit_with_message(msg):
     print(msg)
-    sys.exit(f"Usage: {sys.argv[0]} -apb|-ahb -tb|-ch|-md ip.yml instance_name")    
+    sys.exit(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahb -tb|-ch|-md")    
 
 def main():
     global IP
@@ -684,14 +685,23 @@ def main():
     else:
         exit_with_message("You must specify a bus type using -apb or -ahb option.")
 
-    if ".yaml" not in args[0] and ".yml" not in args[0]:
-        exit_with_message("First argument must be an IP description file in YAML")
+    if ".yaml" not in args[0] and ".yml" not in args[0] and ".json" not in args[0]:
+        exit_with_message("First argument must be an IP description file in YAML or JSON format.")
     
-    with open(args[0], "r") as stream:
-        try:
-            IP=yaml.safe_load(stream)
-        except Exception:
-            raise sys.exit("Error loading the YAML file! Please check the file for syntax errors; you may use yamllint for this.")
+    # self.data = json.load(jfile)
+
+    if ".json" in args[0]:
+        with open(args[0], "r") as jfile:
+            try:
+                IP = json.load(jfile)
+            except Exception:
+                raise sys.exit("Error loading the JSON file! Please check the file for syntax errors; you may use jsonlint for this.")
+    else:    
+        with open(args[0], "r") as stream:
+            try:
+                IP=yaml.safe_load(stream)
+            except Exception:
+                raise sys.exit("Error loading the YAML file! Please check the file for syntax errors; you may use yamllint for this.")
 
     if "-tb" in opts:
         print_tb(bus_type)
