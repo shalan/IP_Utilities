@@ -30,12 +30,11 @@
 `define     TB_DUMP(file, mod, level)           initial begin $dumpfile(file); $dumpvars(level, mod); end
 `define     TB_FINISH(length)                   initial begin #``length``; $display("Verification Failed: Timeout");$finish; end
 `define     TB_WAIT_FOR_CLOCK_CYC(clk, count)   repeat(count) begin @(posedge clk) end
-`define     TB_EVENT(name)                      event e_```name```_start, e_```name```_done;
-`define     TB_TEST_BEGIN(name)                 initial : name \
-                                                    begin \
-                                                        @(e_```name```_start);
-`define     TB_TEST_END(name)                           -> e_```name```_done; \
-                                                    end 
+`define     TB_TEST_EVENT(name)                 event e_``name``_start, e_``name``_done;
+`define     TB_TEST_BEGIN(name)                 initial  begin : name \
+                                                @(e_``name``_start);
+`define     TB_TEST_END(name)                   -> e_``name``_done; \
+                                                end 
 `define     TB_APB_SIG                          reg PWRITE, PENABLE, PSEL; reg [31:0] PWDATA, PADDR; wire PREADY; wire [31:0] PRDATA; wire IRQ;
 `define     TB_AHB_SIG                          reg HWRITE, HSEL; reg [2:0] HSIZE; reg [1:0] HTRANS; reg [31:0] HWDATA, HADDR; wire HREADY, HREADYOUT; wire [31:0] HRDATA; wire IRQ;
 `define     TB_WB_SIG                           reg clk_i, rst_i; reg cyc_i, stb_i, we_i; reg [3:0] sel_i; reg [31:0] adr_i, dat_i; wire ack_o; wire[31:0]  dat_o;
