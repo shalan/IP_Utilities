@@ -587,17 +587,20 @@ def print_reg_def():
     print(f" {ip_name}_TYPE;")
     print("\n#endif\n")
 
+"""
+    Print bitfield JSON for all registers
+"""
 def print_bf():
     for r in IP["registers"]:
         print(f"\n{r['name']}.json")
-        print("{reg:[")
+        print("<img src=\"https://svg.wavedrom.com/{reg:[", end="")
         if not "fields" in r:
             if isinstance(r["size"], int):
                 size = int(r["size"])
             else:
                 size = get_param_default(r["size"])
-            print(f"\t{{name:\"{r['name']}\", bits:{size}}},")
-            print(f"\t{{bits: {32-size}}}")
+            print(f"{{name:'{r['name']}', bits:{size}}},", end="")
+            print(f"{{bits: {32-size}}}" , end="")
         else:
             l = 0
             for f in r["fields"]:
@@ -606,9 +609,10 @@ def print_bf():
                 else:
                     size = get_param_default(f["bit_width"])
                 l = l + size
-                print(f"\t{{name:\"{f['name']}\", bits:{size}}},")
-            print(f"\t{{bits: {32-r['size']}}}")
-        print("], config: {hspace: width, lanes: 2, hflip: true}}")
+                print(f"{{name:'{f['name']}', bits:{size}}},", end="")
+            print(f"{{bits: {32-r['size']}}}", end="")
+        #print("], config: {hspace: width, lanes: 2, hflip: true}}")
+        print("], config: {lanes: 2, hflip: true}} \"/>")
 
 def print_md_table():
     print("\n## Registers\n")
@@ -655,7 +659,7 @@ def print_md_table():
             
         
 def print_help():
-    print(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahb -tb|-ch|-md") 
+    print(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahbl -tb|-ch|-md") 
     print("Options:")
     print("\t-apb : generate APB wrapper")
     print("\t-ahb : generate AHB wrapper")
@@ -666,7 +670,7 @@ def print_help():
 
 def exit_with_message(msg):
     print(msg)
-    sys.exit(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahb -tb|-ch|-md")    
+    sys.exit(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahbl -tb|-ch|-md")    
 
 def main():
     global IP
