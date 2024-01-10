@@ -617,6 +617,31 @@ def print_bf():
         #print("], config: {hspace: width, lanes: 2, hflip: true}}")
         print("], config: {lanes: 2, hflip: true}} \"/>")
 
+def print_reg_bf(r):
+    print("<img src=\"https://svg.wavedrom.com/{reg:[", end="")
+    if not "fields" in r:
+        if isinstance(r["size"], int):
+            size = int(r["size"])
+        else:
+            size = get_param_default(r["size"])
+        print(f"{{name:'{r['name']}', bits:{size}}},", end="")
+        print(f"{{bits: {32-size}}}" , end="")
+    else:
+        l = 0
+        for f in r["fields"]:
+            if f["bit_offset"] > l:
+                print(f"{{bits: {f['bit_offset']-l}}},", end="")
+                l = f["bit_offset"]
+            if isinstance(f["bit_width"], int):
+                size = int(f["bit_width"])
+            else:
+                size = get_param_default(f["bit_width"])
+            l = l + size
+            print(f"{{name:'{f['name']}', bits:{size}}},", end="")
+        print(f"{{bits: {32-l}}}", end="")
+        #print("], config: {hspace: width, lanes: 2, hflip: true}}")
+    print("], config: {lanes: 2, hflip: true}} \"/>")
+
 def print_md_table():
     print("\n## Registers\n")
     print("|register name|offset|size|mode|description|")
@@ -645,6 +670,8 @@ def print_md_table():
                 else:
                     width = get_param_default(f["bit_width"])
                 print("|{0}|{1}|{2}|{3}|".format(f["bit_offset"], f["name"], width, f["description"]))
+        print()
+        print_reg_bf(r)
 
     if "flags" in IP:
         c = 0;
@@ -716,7 +743,7 @@ def main():
         print_reg_def()
     elif "-md" in opts:
         print_md_table()
-        print_bf()
+        #print_bf()
     else:
         print_bus_wrapper(bus_type)
     
