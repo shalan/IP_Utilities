@@ -604,13 +604,16 @@ def print_bf():
         else:
             l = 0
             for f in r["fields"]:
+                if f["bit_offset"] > l:
+                    print(f"{{bits: {f['bit_offset']-l}}},", end="")
+                    l = f["bit_offset"]
                 if isinstance(f["bit_width"], int):
                     size = int(f["bit_width"])
                 else:
                     size = get_param_default(f["bit_width"])
                 l = l + size
                 print(f"{{name:'{f['name']}', bits:{size}}},", end="")
-            print(f"{{bits: {32-r['size']}}}", end="")
+            print(f"{{bits: {32-l}}}", end="")
         #print("], config: {hspace: width, lanes: 2, hflip: true}}")
         print("], config: {lanes: 2, hflip: true}} \"/>")
 
