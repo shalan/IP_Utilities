@@ -1,7 +1,7 @@
 
 ## IP wrapper generator for AMBA APB and AHB Lite
 
-``amba_wrap.py -apb|-ahb -tb|-ch|-md ip.yml``
+``amba_wrap.py ip.yml|ip.json -apb|-ahbl -tb|-ch|-md``
 - Options:
     - `-apb` : generate APB wrapper
     - `-ahb` : generate AHB wrapper
@@ -9,16 +9,43 @@
     - `-ch` : generate a C header file containing the register definitions
     - `-md` : generate documentation in MD and Bitfield formats
 - Arguments:
-    - `ip.yml`: A YAML file that contains the IP definition
+    - `ip.yml|ip.json`: A YAML/JSON file that contains the IP definition
 
-## YAML templategGenerator
+## YAML Template Generator
 
-``v2yaml.py verilog_file module_name``
+``v2yaml.py IP.v module_name``
 
-## YAML IP definition file format
+## A Typical Workflow
+
+1. Describe the IP in JAML or JSON format. The format is outlined in the following section. To make things easier, ```v2yaml.py``` may be used to generate a template YAML file from the IP RTL Verilog file with some of the sections filled aautomatically for you.
+
+2. [Optional] Convert the YAML filr into JSON using tools such as [this one](https://onlineyamltools.com/convert-yaml-to-json).
+
+3. Generate the wrapper RTL by invoking: 
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+``amba_wrap.py ip.yml|ip.json -apb|-ahbl > ip_APB.v``
+
+4. Genertate a template testbench.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+``amba_wrap.py ip.yml|ip.json -apb|-ahbl -tb > ip_APB_tb.v``
+
+5. Generate the Register Definitions C header file needed for FW development.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+``amba_wrap.py ip.yml|ip.json -apb|-ahbl -ch > ip_APB.h``
+
+6. Generate pieces of the Markdown document of the IP. This includes register/fields tables as well as graphics for the register fields in the bitfield format.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+``amba_wrap.py ip.yml|ip.json -apb|-ahbl -md > ip_APB.md``
+## YAML IP Definition File Format
 
 A YAML file is used to capture the IP information. This includes:
-### info
+
+### General Information
+
 Basic information about the IP like the author, the license, etc. For an example:
 ```yaml
 info: 
@@ -48,34 +75,23 @@ info:
   analog_supply_voltage: "n/a"
   ```
 
-### registers
-Register definitions. For an example:
-```yaml
-registers:
-  - name: "data"
-    size: 8
-    mode: "rw"
-    offset: 0
-    bit_access: no
-    read_port: "data_in"
-    write_port: "data_out"
-    description: "Data register."
-  - name: "out_en"
-    size: 8
-    mode: "w"
-    offset: 4
-    bit_access: no
-    write_port: "out_en"
-    description: "Output enable register; used to set the direction: 1-out, 0-in"
+### Parameter Definitions
+
+This section is used if the IP RTL model is parameterized. The parameters defined in this section can be used in other sections to specify width of fields and registers.
+
+```YAML
+parameters:
+  - name: SC
+    default: 8
+  - name: MDW
+    default: 9
+  - name: GFLEN
+    default: 8
+  - name: FAW
+    default: 4
 ```
-The ``mode`` property can be set to: 
-- ``w`` for registers that are meant for writing only; reading from it returns the last written data value.
-- ``r`` for registers that are meant for reading only; hence they cannot be written. 
-- ``rw`` for registers that are read and written differently; for an example, the data register of a GPIO peripheral. Reading this register returns the data provided on input GPIO pins and writting the register sets the values of output GPIO pins.
+### Port Definitions
 
-The ``bit_access`` property is used to enable bit level access.
-
-### ports
 IP Port definitions. For an example:
 ```yaml
 ports:
@@ -100,7 +116,7 @@ ports:
   - name: "flags_hi"
     width: 8
 ```
-### external_interface
+### External Interface Definitions
 IP External Interfaces to other sub-systems. For an example:
 ```yaml
 external_interface: 
@@ -117,7 +133,69 @@ external_interface:
     direction: "output"
     width: 8
 ```
-### flags
+
+### Clock and Reset Definitions
+
+```YAML
+clock:
+  name: clk
+
+reset:
+  name: rst_n
+  level: 0
+```
+
+### Register Definitions
+
+Register definitions. For an example:
+```yaml
+registers:
+  - name: "data"
+    size: 8
+    mode: "rw"
+    offset: 0
+    bit_access: no
+    fifo: no
+    read_port: "data_in"
+    write_port: "data_out"
+    description: "Data register."
+  - name: "out_en"
+    size: 8
+    mode: "w"
+    offset: 4
+    bit_access: no
+    write_port: "out_en"
+    description: "Output enable register; used to set the direction: 1-out, 0-in"
+```
+- The ``mode`` property can be set to: 
+  - ``w`` for registers that are meant for writing only; reading from it returns the last written data value.
+  - ``r`` for registers that are meant for reading only; hence they cannot be written. 
+  - ``rw`` for registers that are read and written differently; for an example, the data register of a GPIO peripheral. Reading this register returns the data provided on input GPIO pins and writting the register sets the values of output GPIO pins.
+
+- The ``bit_access`` property is used to enable bit level access.
+- The ``fifo`` property is used to specify whether this register is used to access a FIFO. If it is set to ``yes`` the FIFO has to be defined.
+
+### FIFO Definitions
+
+```yaml
+fifos:
+  - type: read  
+    width: MDW
+    depth: 16 
+    register: rxdata
+    data_port: rdata
+    control_port: rd
+  - type: write
+    width: MDW
+    depth: 16
+    register: txdata
+    data_port: wdata
+    control_port: wr
+```
+
+
+### Event Flag Definitions
+
 Event flags used for generating interrupts. For an example:
 ```yaml
 flags: 
