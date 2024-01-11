@@ -644,19 +644,23 @@ def print_reg_bf(r):
 
 def print_md_table():
     print("\n## Registers\n")
-    print("|register name|offset|size|mode|description|")
+    print("|Name|Offset|Reset Value|Access Mode|Description|")
     print("|---|---|---|---|---|")
     for r in IP["registers"]:
         if isinstance(r["size"], int):
             size = int(r["size"])
         else:
             size = get_param_default(r["size"])
-        print("|{0}|{1}|{2}|{3}|{4}|".format(r["name"], hex(r["offset"])[2:].zfill(4), size, r["mode"], r["description"]))
+        if "init" in r:
+            reset_value = '0x' + r["init"].strip("'h?").zfill(8)
+        else:
+            reset_value = "0x00000000"
+        print("|{0}|{1}|{2}|{3}|{4}|".format(r["name"], hex(r["offset"])[2:].zfill(4), reset_value, r["mode"], r["description"]))
     if "flags" in IP:
-        print("|{0}|{1}|{2}|{3}|{4}|".format("IM", hex(IM_OFF)[2:].zfill(4), len(IP['flags']), "w", "Interrupt Mask Register; check the flags table for more details"))
-        print("|{0}|{1}|{2}|{3}|{4}|".format("RIS", hex(RIS_OFF)[2:].zfill(4), len(IP['flags']), "w", "Raw Interrupt Status; check the flags table for more details"))
-        print("|{0}|{1}|{2}|{3}|{4}|".format("MIS", hex(MIS_OFF)[2:].zfill(4), len(IP['flags']), "w", "Masked Interrupt Status; check the flags table for more details"))
-        print("|{0}|{1}|{2}|{3}|{4}|".format("IC", hex(IC_OFF)[2:].zfill(4), len(IP['flags']), "w", "Interrupt Clear Register; check the flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("IM", hex(IM_OFF)[2:].zfill(4), len(IP['flags']), "w", "Interrupt Mask Register; write 1/0 to enable/disable interrupts; check the interrupt flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("RIS", hex(RIS_OFF)[2:].zfill(4), len(IP['flags']), "w", "Raw Interrupt Status; reflects the current interrupts status;check the interrupt flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("MIS", hex(MIS_OFF)[2:].zfill(4), len(IP['flags']), "w", "Masked Interrupt Status; On a read, this register gives the current masked status value of the corresponding interrupt. A write has no effect; check the interrupt flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("IC", hex(IC_OFF)[2:].zfill(4), len(IP['flags']), "w", "Interrupt Clear Register; On a write of 1, the corresponding interrupt (both raw interrupt and masked interrupt, if enabled) is cleared; check the interrupt flags table for more details"))
 
     for r in IP["registers"]:
         print(f"\n### {r['description']} [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
@@ -676,15 +680,16 @@ def print_md_table():
     if "flags" in IP:
         c = 0;
         print("\n## Interrupt Flags\n")
-        print("|bit|flag|width|")
-        print("|---|---|---|")
+        print("\nThe following are the bit definitions for the interrupt registers: IM, RIS, MIS, and IC.\n")
+        print("|Bit|Flag|Width|Description|")
+        print("|---|---|---|---|")
         for flag in IP["flags"]:
             width = get_port_width(flag["port"])
             if isinstance(width, int):
                 w = width
             else:
                 w = get_param_default(width)
-            print(f"|{c}|{flag['name'].upper()}|{w}|")
+            print(f"|{c}|{flag['name'].upper()}|{w}|{flag['description']}|")
             c += w
             
         
