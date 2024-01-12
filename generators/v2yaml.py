@@ -55,12 +55,12 @@ print(f"""info:
     - <another tag>
   bus:
     - <generic|ahb|apb|wb>
-  type": <soft|hard|firm>
+  type: <soft|hard|firm>
   status: <verified|fpga|silicon>
   qualification: <Comm|Ind|Automotive|Mil>
   cell_count: "<count>
-  width": <width>
-  height": <height>
+  width: <width>
+  height: <height>
   technology: <tech>
   clock_freq_mhz: <frequency in MHz>
   digital_supply_voltage: <DVDD>
@@ -86,7 +86,7 @@ for p in m.parsed_module['ports']:
             width = int(t.split("[")[1]) - int(f.split("]")[0]) + 1
     print(f" - name: {p['name']}\n   width: {width}")
 
-print("\nclock:\nclock:\n name: <clk_name>")
+print("\nclock:\n name: <clk_name>")
 print("\nreset:\n name: <rst_name>\n level: 0")
 print("\nexternal_interface:")
 print("\nregisters:")
