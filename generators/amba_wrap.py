@@ -123,13 +123,14 @@ def print_module_header(bus_type):
     # Print module name
     print(f"module {IP['info']['name']}_{bus_type} #( \n\tparameter\t")
 
-    for index, p in enumerate(IP['parameters']):
-        print(f"\t\t\t\t{p['name']} = {p['default']}", end="")
-        if index != len(IP['parameters']) - 1:
-            print(",")
-    print("\n)(")
+    if "parameters" in IP:
+        for index, p in enumerate(IP['parameters']):
+            print(f"\t\t\t\t{p['name']} = {p['default']}", end="")
+            if index != len(IP['parameters']) - 1:
+                print(",")
+        print("\n)(")
 
-    if IP["external_interface"]:
+    if "external_interface" in IP:
         # Print {bus_type}_SLAVE_PORTS
         print(f"\t`{bus_type}_SLAVE_PORTS,")
 
@@ -209,12 +210,16 @@ def print_instance_to_wrap():
     Returns:
         None
     """
-    print(f"\t{IP['info']['name']} #(")
-    for index, p in enumerate(IP['parameters']):
-        print(f"\t\t.{p['name']}({p['name']})", end="")
-        if index != len(IP['parameters']) - 1:
-            print(",")
-    print("\n\t) instance_to_wrap (")
+    if "parameters" in IP:
+        print(f"\t{IP['info']['name']} #(")
+        for index, p in enumerate(IP['parameters']):
+            print(f"\t\t.{p['name']}({p['name']})", end="")
+            if index != len(IP['parameters']) - 1:
+                print(",")
+        print("\n\t) instance_to_wrap (")
+    else:
+        print(f"\t{IP['info']['name']} instance_to_wrap (")
+
     print(f"\t\t.{IP['clock']['name']}({IP['clock']['name']}),")
     print(f"\t\t.{IP['reset']['name']}({IP['reset']['name']}),")
     for index, p in enumerate(IP['ports']):
@@ -254,7 +259,7 @@ def print_registers(bus_type):
                 print(f"\t`{bus_type}_REG({r['name']}_REG, 0, 8)")
             elif r['mode'] == 'w':
                 print(f"\treg [{r['size']}-1:0]\t{r['name']}_REG;")
-                if "fields" in r:
+                if "fields" in r and "write_port" not in r:
                     for f in r['fields']:
                         if isinstance(f['bit_width'], int):
                             to = f['bit_width'] + f['bit_offset'] - 1
@@ -441,7 +446,8 @@ def print_bus_wrapper(bus_type):
         print_registers_offsets(bus_type)
         print_wires(bus_type)
         print_registers(bus_type)
-        print_IRQ_registers(bus_type)
+        if "flags" in IP:
+            print_IRQ_registers(bus_type)
         print_instance_to_wrap()
         print_rdata(bus_type)
         print_fifos(bus_type)
