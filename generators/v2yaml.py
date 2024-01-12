@@ -48,7 +48,7 @@ print(f"""info:
   author: <author>
   email: <email>
   version: <version>
-  date: {now.strftime('%d/%m/%Y')}
+  date: {now.strftime('%d-%m-%Y')}
   category: <digital|analog>
   tags:
     - <a tag>
