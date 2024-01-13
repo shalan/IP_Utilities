@@ -672,6 +672,7 @@ def print_md_table():
     for r in IP["registers"]:
         print(f"\n### {r['name']} Register [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
         print(f"\n{r['description']}")
+        print_reg_bf(r)
         if "fields" in r:
             print("\n|bit|field name|width|description|")
             print("|---|---|---|---|")
@@ -682,7 +683,7 @@ def print_md_table():
                     width = get_param_default(f["bit_width"])
                 print("|{0}|{1}|{2}|{3}|".format(f["bit_offset"], f["name"], width, f["description"]))
         print()
-        print_reg_bf(r)
+        
 
     if "flags" in IP:
         c = 0;
