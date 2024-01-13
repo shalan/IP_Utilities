@@ -71,7 +71,7 @@ print("parameters:")
 for p in m.parsed_module['parameters']:
     print(f" - name: {p['name']}\n   default: {p['value']}")
 
-print("\n# Remove the clock and reset ports from the following list\nports:")
+print("\n# Remove the clock, reset and external interface ports from the following list\nports:")
 for p in m.parsed_module['ports']:
     #print(p)
     if p['packed'] == "":
