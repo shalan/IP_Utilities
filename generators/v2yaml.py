@@ -80,10 +80,12 @@ for p in m.parsed_module['ports']:
         ft = p["packed"].split(":")
         f = ft[1]
         t = ft[0]
-        if not isinstance(t.split("[")[1], int):
-            width = t.split("[")[1].split("-")[0]
-        else:
-            width = int(t.split("[")[1]) - int(f.split("]")[0]) + 1
+        try:
+            width = int(t.split("[")[1])
+            width = width - int(f.split("]")[0]) + 1
+        except ValueError:
+            width = t.split("[")[1].split("-")[0] + "+1"
+
     print(f" - name: {p['name']}\n   width: {width}")
 
 print("\nclock:\n name: <clk_name>")
