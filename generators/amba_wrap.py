@@ -121,15 +121,16 @@ def print_module_header(bus_type):
         None
     """
     # Print module name
-    print(f"module {IP['info']['name']}_{bus_type} #( \n\tparameter\t")
+    print(f"module {IP['info']['name']}_{bus_type}", end="") 
 
     if "parameters" in IP:
+        print("#( \n\tparameter\t")
         for index, p in enumerate(IP['parameters']):
             print(f"\t\t\t\t{p['name']} = {p['default']}", end="")
             if index != len(IP['parameters']) - 1:
                 print(",")
-        print("\n)(")
-
+        print("\n)", end="")
+    print(" (")
     if "external_interface" in IP:
         # Print {bus_type}_SLAVE_PORTS
         print(f"\t`{bus_type}_SLAVE_PORTS,")
@@ -669,7 +670,7 @@ def print_md_table():
         print("|{0}|{1}|{2}|{3}|{4}|".format("IC", hex(IC_OFF)[2:].zfill(4), "0x00000000", "w", "Interrupt Clear Register; On a write of 1, the corresponding interrupt (both raw interrupt and masked interrupt, if enabled) is cleared; check the interrupt flags table for more details"))
 
     for r in IP["registers"]:
-        print(f"\n### {r['description']} [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
+        print(f"\n### {r['name']} Register [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
         print(f"\n{r['description']}")
         if "fields" in r:
             print("\n|bit|field name|width|description|")
