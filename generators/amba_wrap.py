@@ -44,7 +44,7 @@ def print_header(bus_type):
     """
     print(f"/* THIS FILE IS GENERATED, DO NOT EDIT */\n")
     print(f"`timescale\t\t\t1ns/1ps")
-    print(f"`default_nettype\t\tnone\n")
+    print(f"`default_nettype\tnone\n")
     print(f"`define\t\t\t\t{bus_type}_AW\t\t\t{BUS_AW}\n")
     print(f"`include\t\t\t\"{bus_type.lower()}_wrapper.vh\"\n")    
 def print_license():
