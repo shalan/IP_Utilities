@@ -515,7 +515,7 @@ def print_tb(bus_type):
 
     print(f"\n\t`include \"{bus_type.lower()}_tasks.vh\"\n")
 
-    print("\tevent\te_test1_start, e_test1_done;")
+    print("\t`TB_TEST_EVENT(test1)\n")
     print("\tinitial begin\n"
           "\t\t#999 -> e_assert_reset;\n"
           "\t\t@(e_reset_done);\n\n"
