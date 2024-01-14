@@ -84,7 +84,7 @@ for p in m.parsed_module['ports']:
             width = int(t.split("[")[1])
             width = width - int(f.split("]")[0]) + 1
         except ValueError:
-            width = t.split("[")[1].split("-")[0] + "+1"
+            width = t.split("[")[1].split("-")[0]
 
     print(f" - name: {p['name']}\n   width: {width}")
 
