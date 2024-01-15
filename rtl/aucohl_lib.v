@@ -68,6 +68,7 @@ endmodule
 module aucohl_ticker #(parameter W=8) (
     input   wire            clk, 
     input   wire            rst_n,
+    input   wire            en,
     input   wire [W-1:0]    clk_div,
     output  wire            tick
 );
@@ -75,12 +76,13 @@ module aucohl_ticker #(parameter W=8) (
     reg [W-1:0] counter;
     wire        counter_is_zero = (counter == 'b0);
     always @(posedge clk, negedge rst_n)
-        if(rst_n)
+        if(~rst_n)
             counter <=  'b0;
-        else if(counter_is_zero)
-            counter <=  clk_div - 'b1;
-        else
-            counter <=  counter - 'b1; 
+        else if(en) 
+            if(counter_is_zero)
+                counter <=  clk_div;
+            else
+                counter <=  counter - 'b1; 
 
     assign tick = (clk_div == 'b1)  ?   1'b1 : counter_is_zero;
     
