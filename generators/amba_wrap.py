@@ -538,8 +538,8 @@ def print_reg_def():
     ip_name = IP['info']['name'].upper()
     off = 0
     print_license()
-    print(f"#ifndef {ip_name}_H")
-    print(f"#define {ip_name}_H\n")
+    print(f"#ifndef {ip_name}REGS_H")
+    print(f"#define {ip_name}REGS_H\n")
     print("#ifndef IO_TYPES")
     print("#define IO_TYPES")
     print("#define   __R     volatile const unsigned int")
@@ -586,10 +586,10 @@ def print_reg_def():
         off = off + 4
     reserved_size = int((INT_REG_OFF - off)/4)
     print(f"\t__R \treserved[{(reserved_size)}];")
-    print("\t__W \ticr;")
-    print("\t__R \tris;")
     print("\t__RW\tim;")
     print("\t__R \tmis;")
+    print("\t__R \tris;")
+    print("\t__W \ticr;")
     print("}", end="")
     print(f" {ip_name}_TYPE;")
     print("\n#endif\n")
