@@ -18,7 +18,7 @@
 
 `define		AHBL_BLOCK(name, init)		always @(posedge HCLK or negedge HRESETn) if(~HRESETn) name <= init;
 
-`define     AHBL_CTRL_SIGNALS            reg  last_HSEL, last_HWRITE; reg [31:0] last_HADDR; reg [1:0] last_HTRANS;\
+`define     AHBL_CTRL_SIGNALS           reg  last_HSEL, last_HWRITE; reg [31:0] last_HADDR; reg [1:0] last_HTRANS;\
                                         always@ (posedge HCLK) begin \
                                             if(HREADY) begin\
                                                 last_HSEL       <= HSEL;\
@@ -40,7 +40,7 @@
                                             IC_REG <= HWDATA[``size``-1:0]; \
                                         else IC_REG <= ``size``'d0;
 
-`define     AHBL_SLAVE_PORTS             input wire          HCLK,\
+`define     AHBL_SLAVE_PORTS            input wire          HCLK,\
                                         input wire          HRESETn,\
                                         input wire          HWRITE,\
                                         input wire [31:0]   HWDATA,\
