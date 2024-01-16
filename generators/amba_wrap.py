@@ -407,8 +407,10 @@ def print_rdata(bus_type):
     prefix = "last_H"
     if bus_type == "APB":
         prefix = "P"
+        print(f"\tassign\t{prefix}RDATA = ")
+    else:
+        print(f"\tassign\tHRDATA = ")
     
-    print(f"\tassign\t{prefix}RDATA = ")
     for index,r in enumerate(IP['registers']):
         if "r" in r['mode'] or r['fifo'] is True:
             print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
@@ -421,7 +423,10 @@ def print_rdata(bus_type):
     
     print("\t\t\t32'hDEADBEEF;")
     
-    print(f"\n\tassign {prefix}READY = 1'b1;\n")
+    if bus_type == "APB":
+        print(f"\n\tassign\t{prefix}READY = 1'b1;\n")
+    else:
+        print(f"\n\tassign\tHREADY = 1'b1;\n")
 
 def print_fifos(bus_type):
     if "fifos" in IP:
@@ -701,7 +706,6 @@ def print_md_table():
                 print("|{0}|{1}|{2}|{3}|".format(f["bit_offset"], f["name"], width, f["description"]))
         print()
         
-
     if "flags" in IP:
         c = 0;
         print("\n### Interrupt Flags\n")
