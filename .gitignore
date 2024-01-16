@@ -56,3 +56,5 @@ tmp.v
 *.vvp
 *.o
 tmp.*
+
+DS_Store
