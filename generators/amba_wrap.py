@@ -662,7 +662,9 @@ def print_md_table():
     
     print("\n### Ports \n")
     print("|Port|Direction|Width|Description|")
-    print("|---|---|---|---|")       
+    print("|---|---|---|---|")
+    for port in IP["external_interface"]:
+        print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")       
     for port in IP["ports"]:
         print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")
 
