@@ -190,6 +190,7 @@ def print_wires(bus_type):
     print("")
 
     # Print wire declarations for the interfaces if needed
+    """
     if IP["external_interface"]:
         for i in IP['external_interface']:
             if i['name'] != i['port']:
@@ -198,7 +199,7 @@ def print_wires(bus_type):
                 else:
                     print(f"\tassign\t{i['name']} = {i['port']};")
             #print(f"\twire [{i['width']-1}:0]\t{i['name']};")
-
+    """
     print("")
     
 def print_instance_to_wrap():
@@ -231,9 +232,9 @@ def print_instance_to_wrap():
     if "external_interface" in IP:
         for index, ifc in enumerate(IP['external_interface']):
             if index != len(IP['external_interface']) - 1:
-                print(f"\t\t.{ifc['name']}({ifc['name']}),")
+                print(f"\t\t.{ifc['port']}({ifc['name']}),")
             else:
-                print(f"\t\t.{ifc['name']}({ifc['name']})")
+                print(f"\t\t.{ifc['port']}({ifc['name']})")
     print("\t);\n")
 
 

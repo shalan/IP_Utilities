@@ -68,22 +68,37 @@ endmodule
 module aucohl_ticker #(parameter W=8) (
     input   wire            clk, 
     input   wire            rst_n,
+    input   wire            en,
     input   wire [W-1:0]    clk_div,
     output  wire            tick
 );
 
     reg [W-1:0] counter;
     wire        counter_is_zero = (counter == 'b0);
-    always @(posedge clk, negedge rst_n)
-        if(rst_n)
-            counter <=  'b0;
-        else if(counter_is_zero)
-            counter <=  clk_div - 'b1;
-        else
-            counter <=  counter - 'b1; 
+    wire        tick_w;
+    reg         tick_reg;
 
-    assign tick = (clk_div == 'b1)  ?   1'b1 : counter_is_zero;
-    
+    always @(posedge clk, negedge rst_n)
+        if(~rst_n)
+            counter <=  'b0;
+        else if(en) 
+            if(counter_is_zero)
+                counter <=  clk_div;
+            else
+                counter <=  counter - 'b1; 
+
+    assign tick_w = (clk_div == 'b1)  ?   1'b1 : counter_is_zero;
+
+    always @(posedge clk or negedge rst_n)
+        if(!rst_n)
+            tick_reg <= 1'b0;
+        else if(en)
+            tick_reg <= tick_w;
+        else
+            tick_reg <= 0;
+
+    assign tick = tick_reg;
+
 endmodule
 
 /*
@@ -113,7 +128,7 @@ module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
             shifter <= {shifter[N-2:0], in};
 
     wire all_ones   = & shifter;
-    wire all_zeros  = | shifter;
+    wire all_zeros  = ~| shifter;
 
     always @(posedge clk, negedge rst_n)
         if(!rst_n)
