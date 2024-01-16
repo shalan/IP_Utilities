@@ -539,8 +539,8 @@ def print_reg_def():
     ip_name = IP['info']['name'].upper()
     off = 0
     print_license()
-    print(f"#ifndef {ip_name}_H")
-    print(f"#define {ip_name}_H\n")
+    print(f"#ifndef {ip_name}REGS_H")
+    print(f"#define {ip_name}REGS_H\n")
     print("#ifndef IO_TYPES")
     print("#define IO_TYPES")
     print("#define   __R     volatile const unsigned int")
@@ -587,10 +587,10 @@ def print_reg_def():
         off = off + 4
     reserved_size = int((INT_REG_OFF - off)/4)
     print(f"\t__R \treserved[{(reserved_size)}];")
-    print("\t__W \ticr;")
-    print("\t__R \tris;")
     print("\t__RW\tim;")
     print("\t__R \tmis;")
+    print("\t__R \tris;")
+    print("\t__W \ticr;")
     print("}", end="")
     print(f" {ip_name}_TYPE;")
     print("\n#endif\n")
@@ -651,7 +651,33 @@ def print_reg_bf(r):
     print("], config: {lanes: 2, hflip: true}} \"/>")
 
 def print_md_table():
-    print("\n## Registers\n")
+    print("\n## The Interface \n")
+    
+    if "parameters" in IP:
+        print("\n### Module Parameters \n")
+        print("|Parameter|Description|Default Value|")
+        print("|---|---|---|")       
+        for parameter in IP["parameters"]:
+            print(f"|{parameter['name']}|{parameter['description']}|{parameter['default']}|")
+    
+    print("\n### Ports \n")
+    print("|Port|Direction|Width|Description|")
+    print("|---|---|---|---|")       
+    for port in IP["ports"]:
+        print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")
+
+    
+    print("\n## Sky130 Implementation \n")
+    print("|Module | Number of cells | Max. freq |")
+    print("|---|---|---|")
+    print(f"|{IP['info']['name']}|||")
+    print(f"|{IP['info']['name']}_APB|||")
+    print(f"|{IP['info']['name']}_AHBL|||")
+    print(f"|{IP['info']['name']}_WB|||")
+
+    print("\n## System Integration\n")
+
+    print("\n## I/O Registers\n")
     print("|Name|Offset|Reset Value|Access Mode|Description|")
     print("|---|---|---|---|---|")
     for r in IP["registers"]:
@@ -700,6 +726,22 @@ def print_md_table():
                 w = get_param_default(width)
             print(f"|{c}|{flag['name'].upper()}|{w}|{flag['description']}|")
             c += w
+    
+    print ("## F/W Usage Guidelines:")
+
+    print ("## Installation:")
+    print ("You can either clone repo or use [IPM](https://github.com/efabless/IPM) which is an open-source IPs Package Manager")
+    print ("* To clone repo:")
+    print(f"```git clone https://{IP['info']['repo']}```")
+    print("* To download via IPM , follow installation guides [here](https://github.com/efabless/IPM/blob/main/README.md) then run ")
+    print(f"```ipm install {IP['info']['name']}```")
+
+    print ("## Simulation:")
+    print ("### Run Verilog Testbench:")
+    print ("1. Clone [IP_Utilities](https://github.com/shalan/IP_Utilities) repo in the same directory as the IP")
+    print (f"2. In the directory ``{IP['info']['name']}/verify/utb/`` run ``make APB-RTL`` to run testbench for APB or ``make AHBL-RTL`` to run textbench for AHBL")
+    print ("### Run cocotb UVM Testbench:")
+    print ("TBD")
             
         
 def print_help():
