@@ -426,7 +426,7 @@ def print_rdata(bus_type):
     if bus_type == "APB":
         print(f"\n\tassign\t{prefix}READY = 1'b1;\n")
     else:
-        print(f"\n\tassign\tHREADY = 1'b1;\n")
+        print(f"\n\tassign\tHREADYOUT = 1'b1;\n")
 
 def print_fifos(bus_type):
     if "fifos" in IP:
