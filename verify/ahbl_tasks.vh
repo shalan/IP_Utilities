@@ -16,37 +16,41 @@
 	limitations under the License.
 */
 
-task AHB_READ (input [2:0] size, input [31:0] addr, output [31:0] data);
+task AHBL_W_READ (input [31:0] addr, output [31:0] data);
     begin : task_body
-        wait (HREADY == 1'b1);
+        wait (HREADYOUT == 1'b1);
         @(posedge HCLK);
         #1;
         HTRANS  = 2'b10;
         HWRITE  = 1'b0;
         HADDR   = addr;
-        HSIZE   = size;
+        HREADY  = 1'b1;
+        HSEL    = 1'b1;
+        // HSIZE   = size;
         @(posedge HCLK);
         #1;
         HTRANS  = 2'b00;
-        wait (HREADY == 1'b1);
+        wait (HREADYOUT == 1'b1);
         @(posedge HCLK) data = HRDATA;
     end
 endtask
 
-task AHB_WRITE(input [2:0] size, input [31:0] addr, input [31:0] data);
+task AHBL_W_WRITE(input [31:0] addr, input [31:0] data);
     begin : task_body
-        wait (HREADY == 1'b1);
+        wait (HREADYOUT == 1'b1);
         @(posedge HCLK);
         #1;
         HTRANS  = 2'b10;
         HWRITE  = 1'b1;
-        HADDR   = ADDR;
-        HSIZE   = size;
+        HADDR   = addr;
+        HREADY  = 1'b1;
+        HSEL    = 1'b1;
+        // HSIZE   = size;
         @(posedge HCLK);
         #1;
         HTRANS  = 2'b00;;
         HWDATA  = data;
         #1;
-        wait(HREADY);
+        wait(HREADYOUT);
     end
 endtask

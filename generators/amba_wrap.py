@@ -426,7 +426,7 @@ def print_rdata(bus_type):
     if bus_type == "APB":
         print(f"\n\tassign\t{prefix}READY = 1'b1;\n")
     else:
-        print(f"\n\tassign\tHREADY = 1'b1;\n")
+        print(f"\n\tassign\tHREADYOUT = 1'b1;\n")
 
 def print_fifos(bus_type):
     if "fifos" in IP:
@@ -511,9 +511,9 @@ def print_tb(bus_type):
                 print("\twire\t", end='')
             print(f"[{ifc['width']-1}:0]\t{ifc['name']};")
 
-    print(f"\n\t`TB_CLK({'HCLK' if bus_type == 'AHB' else 'PCLK'}, CLOCK_PERIOD)")
-    #print(f"\t`TB_SRSTN({'HRESETn' if bus_type == 'AHB' else 'PRESETn'}, {'HCLK' if bus_type == 'AHB' else 'PCLK'}, RESET_DURATION)")
-    print(f"\t`TB_ESRST({'HRESETn' if bus_type == 'AHB' else 'PRESETn'}, 1'b0, {'HCLK' if bus_type == 'AHB' else 'PCLK'}, RESET_DURATION)")
+    print(f"\n\t`TB_CLK({'HCLK' if bus_type == 'AHBL' else 'PCLK'}, CLOCK_PERIOD)")
+    #print(f"\t`TB_SRSTN({'HRESETn' if bus_type == 'AHBL' else 'PRESETn'}, {'HCLK' if bus_type == 'AHBL' else 'PCLK'}, RESET_DURATION)")
+    print(f"\t`TB_ESRST({'HRESETn' if bus_type == 'AHBL' else 'PRESETn'}, 1'b0, {'HCLK' if bus_type == 'AHBL' else 'PCLK'}, RESET_DURATION)")
     print(f"\t`TB_DUMP(\"{bus_type}_{IP['info']['name']}_tb.vcd\", {IP['info']['name']}_{bus_type}_tb, 0)")
     print(f"\t`TB_FINISH(`MS_TB_SIMTIME)")
 
@@ -684,7 +684,9 @@ def print_md_table():
     
     print("\n### Ports \n")
     print("|Port|Direction|Width|Description|")
-    print("|---|---|---|---|")       
+    print("|---|---|---|---|")
+    for port in IP["external_interface"]:
+        print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")       
     for port in IP["ports"]:
         print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")
 
@@ -774,7 +776,7 @@ def print_help():
     print(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahbl -tb|-ch|-md") 
     print("Options:")
     print("\t-apb : generate APB wrapper")
-    print("\t-ahb : generate AHB wrapper")
+    print("\t-ahbl: generate AHBL wrapper")
     print("\t-tb  : generate a Verilog testbench for the generated bus wrapper")
     print("\t-ch  : generate a C header file containing the register definitions")
     print("Arguments:")
@@ -796,10 +798,10 @@ def main():
 
     if "-apb" in opts:
         bus_type = "APB"
-    elif "-ahb" in opts:    
-        bus_type = "AHB"
+    elif "-ahbl" in opts:    
+        bus_type = "AHBL"
     else:
-        exit_with_message("You must specify a bus type using -apb or -ahb option.")
+        exit_with_message("You must specify a bus type using -apb or -ahbl option.")
 
     if ".yaml" not in args[0] and ".yml" not in args[0] and ".json" not in args[0]:
         exit_with_message("First argument must be an IP description file in YAML or JSON format.")

@@ -31,12 +31,12 @@
 	                                    wire	ahbl_we	= last_HWRITE & ahbl_valid;\
 	                                    wire	ahbl_re	= ~last_HWRITE & ahbl_valid;
 
-`define		AHBL_REG(name, init, size)	`AHB_BLOCK(name, init)\
-                                        else if(ahbl_we & (last_HADDR[`AHB_AW-1:0]==``name``_OFFSET)) \
+`define		AHBL_REG(name, init, size)	`AHBL_BLOCK(name, init)\
+                                        else if(ahbl_we & (last_HADDR[`AHBL_AW-1:0]==``name``_OFFSET)) \
                                             name <= HWDATA[``size``-1:0];
 
-`define		AHBL_IC_REG(size)			`AHB_BLOCK(IC_REG, ``size``'b0)\ 
-                                        else if(ahbl_we & (last_HADDR[`AHB_AW-1:0]==IC_REG_OFFSET)) \
+`define		AHBL_IC_REG(size)			`AHBL_BLOCK(IC_REG, ``size``'b0)\ 
+                                        else if(ahbl_we & (last_HADDR[`AHBL_AW-1:0]==IC_REG_OFFSET)) \
                                             IC_REG <= HWDATA[``size``-1:0]; \
                                         else IC_REG <= ``size``'d0;
 
