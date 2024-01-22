@@ -117,6 +117,7 @@ module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
     aucohl_ticker ticker (
         .clk(clk),
         .rst_n(rst_n),
+	.en(1'b1),
         .clk_div(CLKDIV),
         .tick(tick)
     );
