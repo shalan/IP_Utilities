@@ -3,13 +3,13 @@
 
 ``amba_wrap.py ip.yml|ip.json -apb|-ahbl -tb|-ch|-md``
 - Options:
-    - `-apb` : generate APB wrapper
-    - `-ahb` : generate AHB wrapper
-    - `-tb` : generate a Verilog testbench for the generated bus wrapper
-    - `-ch` : generate a C header file containing the register definitions
-    - `-md` : generate documentation in MD and Bitfield formats
+    - `-apb` : generates an APB wrapper.
+    - `-ahbl` : generates an AHB Lite wrapper.
+    - `-tb` : generates a Verilog testbench for the generated bus wrapper.
+    - `-ch` : generates a C header file containing the register definitions.
+    - `-md` : generates documentation in MD and Bitfield formats.
 - Arguments:
-    - `ip.yml|ip.json`: A YAML/JSON file that contains the IP definition
+    - `ip.yml|ip.json`: A YAML/JSON file that contains the IP definition.
 
 ## YAML Template Generator
 
@@ -17,9 +17,9 @@
 
 ## A Typical Workflow
 
-1. Describe the IP in JAML or JSON format. The format is outlined in the following section. To make things easier, ```v2yaml.py``` may be used to generate a template YAML file from the IP RTL Verilog file with some of the sections filled aautomatically for you.
+1. Describe the IP in YAML or JSON format. The format is outlined in the following section. To make things easier, ```v2yaml.py``` may be used to generate a template YAML file from the IP RTL Verilog file with some of the sections filled aautomatically for you.
 
-2. [Optional] Convert the YAML filr into JSON using tools such as [this one](https://onlineyamltools.com/convert-yaml-to-json).
+2. [Optional] Convert the YAML file into JSON using tools such as [this one](https://onlineyamltools.com/convert-yaml-to-json).
 
 3. Generate the wrapper RTL by invoking: 
 
@@ -36,10 +36,11 @@
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 ``amba_wrap.py ip.yml|ip.json -apb|-ahbl -ch > ip_APB.h``
 
-6. Generate pieces of the Markdown document of the IP. This includes register/fields tables as well as graphics for the register fields in the bitfield format.
+6. Generate an, almost, complete Markdown documentation of the IP. This includes register/fields tables as well as graphics for the register fields in the bitfield format.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 ``amba_wrap.py ip.yml|ip.json -apb|-ahbl -md > ip_APB.md``
+
 ## YAML IP Definition File Format
 
 A YAML file is used to capture the IP information. This includes:
@@ -97,24 +98,12 @@ IP Port definitions. For an example:
 ports:
   - name: "data_in"
     width: 8
+    direction: input
+    description: "The input data"
   - name: "data_out"
     width: 8
-  - name: "data_out_en"
-    width: 8
-  - name: "pad_in"
-    width: 8
-  - name: "pad_out"
-    width: 8
-  - name: "pad_out_en"
-    width: 8
-  - name: "flags_pe"
-    width: 8
-  - name: "flags_ne"
-    width: 8
-  - name: "flags_lo"
-    width: 8
-  - name: "flags_hi"
-    width: 8
+    direction: output
+    description: "The output data"
 ```
 ### External Interface Definitions
 IP External Interfaces to other sub-systems. For an example:
@@ -124,14 +113,12 @@ external_interface:
     port: "pad_in"
     direction: "input"
     width: 8
+    description: The input pads
   - name: "o_pad_out"
     port: "pad_out"
     direction: "output"
     width: 8
-  - name: "o_pad_out_en"
-    port: "pad_out_en"
-    direction: "output"
-    width: 8
+    description: The output pads
 ```
 
 ### Clock and Reset Definitions
@@ -150,29 +137,39 @@ reset:
 Register definitions. For an example:
 ```yaml
 registers:
-  - name: "data"
-    size: 8
-    mode: "rw"
-    offset: 0
-    bit_access: no
-    fifo: no
-    read_port: "data_in"
-    write_port: "data_out"
-    description: "Data register."
-  - name: "out_en"
-    size: 8
-    mode: "w"
-    offset: 4
-    bit_access: no
-    write_port: "out_en"
-    description: "Output enable register; used to set the direction: 1-out, 0-in"
+- name: CAP
+  size: 16
+  mode: r
+  fifo: no
+  offset: 8
+  bit_access: no
+  read_port: capture
+  description: The captured value.
+- name: CTRL
+  size: 4
+  mode: w
+  fifo: no
+  offset: 12
+  bit_access: no
+  description: Control Register.
+  fields:
+  - name: TE
+    bit_offset: 0
+    bit_width: 1
+    write_port: tmr_en
+    description: Timer enable
+  - name: CE
+    bit_offset: 1
+    bit_width: 1
+    write_port: cntr_en
+    description: Counter enable
 ```
 - The ``mode`` property can be set to: 
   - ``w`` for registers that are meant for writing only; reading from it returns the last written data value.
   - ``r`` for registers that are meant for reading only; hence they cannot be written. 
   - ``rw`` for registers that are read and written differently; for an example, the data register of a GPIO peripheral. Reading this register returns the data provided on input GPIO pins and writting the register sets the values of output GPIO pins.
 
-- The ``bit_access`` property is used to enable bit level access.
+- The ``bit_access`` property is used to enable bit level access (Not implemented functionality).
 - The ``fifo`` property is used to specify whether this register is used to access a FIFO. If it is set to ``yes`` the FIFO has to be defined.
 
 ### FIFO Definitions
@@ -197,15 +194,14 @@ fifos:
 ### Event Flag Definitions
 
 Event flags used for generating interrupts. For an example:
+
 ```yaml
-flags: 
-  - name: "pe"
-    port: "flags_pe"
-  - name: "ne"
-    port: "flags_ne"
-  - name: "lo"
-    port: "flags_lo"
-  - name: "hi"
-    port: "flags_hi"
+flags:
+- name: CM
+  port: cntr_match
+  description: Counter match.
+- name: CAP
+  port: cap_done
+  description: Capture is done.
 ```
 

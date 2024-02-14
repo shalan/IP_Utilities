@@ -69,7 +69,7 @@ print(f"""info:
 
 print("parameters:")
 for p in m.parsed_module['parameters']:
-    print(f" - name: {p['name']}\n   default: {p['value']}")
+    print(f"- name: {p['name']}\n  default: {p['value']}")
 
 print("\n# Remove the clock, reset and external interface ports from the following list\nports:")
 for p in m.parsed_module['ports']:
@@ -86,10 +86,12 @@ for p in m.parsed_module['ports']:
         except ValueError:
             width = t.split("[")[1].split("-")[0]
 
-    print(f" - name: {p['name']}\n   width: {width}")
+    print(f" - name: {p['name']}\n   width: {width}\n   direction: {p['direction']}\n   description: ")
 
-print("\nclock:\n name: <clk_name>")
-print("\nreset:\n name: <rst_name>\n level: 0")
+print("\nclock:\n  name: <clk_name>")
+print("\nreset:\n  name: <rst_name>\n  level: 0/1")
 print("\nexternal_interface:")
-print("\nregisters:")
-print("\nflags:")
+print("- name: \n  port: \n  direction: \n  width: \n  description: ")
+print("\nregisters: \n- name: \n  size: \n  mode: r/w/rw\n  fifo: no/yes\n  offset: \n  bit_access: no/yes\n  description: ")
+print("  fields:\n  - name: \n    bit_offset: \n    bit_width: \n    write_port: \n    description: ")
+print("\nflags:\n- name: \n  port: \n  description: ")
