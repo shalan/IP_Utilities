@@ -87,7 +87,7 @@ module aucohl_ticker #(parameter W=8) (
             else
                 counter <=  counter - 'b1; 
 
-    assign tick_w = (clk_div == 'b1)  ?   1'b1 : counter_is_zero;
+	assign tick_w = (clk_div == 'b0)  ?   1'b1 : counter_is_zero;
 
     always @(posedge clk or negedge rst_n)
         if(!rst_n)
