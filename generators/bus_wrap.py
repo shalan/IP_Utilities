@@ -19,8 +19,9 @@ Copyright (c) 2020 AUCOHL
    limitations under the License.
 """
 """
-   An automatic wrapper generator for the AMBA Advanced Peripherals Bus (APB).
-   The input is a yaml file that contains the IP definition.
+   An automatic wrapper generator for the AMBA Advanced Peripherals Bus (APB) 
+   and the Advanced High Performance Bus (AHB) Lite, as well as the Wishbone bus.
+   The input is a yaml/json file that contains the IP definition.
 """
 
 
@@ -57,12 +58,8 @@ def print_license():
        print("\tdistribute, sublicense, and/or sell copies of the Software, and to")
        print("\tpermit persons to whom the Software is furnished to do so, subject to")
        print("\tthe following conditions:\n")
-
-
        print("\tThe above copyright notice and this permission notice shall be")
        print("\tincluded in all copies or substantial portions of the Software.\n")
-
-
        print("\tTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,")
        print("\tEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF")
        print("\tMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND")
@@ -70,6 +67,7 @@ def print_license():
        print("\tLIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION")
        print("\tOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION")
        print("\tWITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.")
+   
    elif "APACHE 2.0" in IP['info']['license'].upper():
        print("\tLicensed under the Apache License, Version 2.0 (the \"License\");")
        print("\tyou may not use this file except in compliance with the License.")
@@ -80,6 +78,7 @@ def print_license():
        print("\tWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.")
        print("\tSee the License for the specific language governing permissions and")
        print("\tlimitations under the License.")
+   
    elif "BSD" in IP['info']['license'].upper():
        print("\tRedistribution and use in source and binary forms, with or without modification,")
        print("\tare permitted provided that the following conditions are met:\n")
@@ -95,6 +94,7 @@ def print_license():
        print("\tIN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING ")
        print("\tIN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF ")
        print("\tSUCH DAMAGE.")
+   
    elif "GPL" in IP['info']['license'].upper():
        print("\tThis program is free software; you can redistribute it and/or")
        print("\tmodify it under the terms of the GNU General Public License")
@@ -104,7 +104,6 @@ def print_license():
        print("\tMERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the")
        print("\tGNU General Public License for more details.")
    print("\n*/\n")
-
 
 def print_header(bus_type):
    """
@@ -163,6 +162,9 @@ def print_wires(bus_type):
 
     This function prints the wire declarations for the clock, reset, and ports of the IP.
     It also includes the `CTRL_SIGNALS` macro.
+
+    Args:
+        The bus type (string): APB, AHBL or WB
 
     Returns:
         None
@@ -299,10 +301,8 @@ def get_port_width(port):
    """
    Get the width of a port.
 
-
    Args:
        port (str): The name of the port.
-
 
    Returns:
        int: The width of the port.
@@ -321,57 +321,47 @@ def get_param_default(param):
 
 
 def print_ris_register(bus_type):
-   """
-   Print the RIS register.
+    """
+    Prints the code for generating the RIS register for the specified bus type.
 
+    Parameters:
+        bus_type (str): The type of bus (e.g. APB, AHBL, WB).
 
-   This function prints the RIS register, iterating over each flag in the IP dictionary
-   and updating the RIS register accordingly.
-   """
+    Returns:
+        None
+    """
+    # declare wires for the flags if the flag name is different than the port it is connected to
+    print()
+    for f in IP['flags']:
+        if f['name'] != f['port']:
+            print(f"\twire [{get_port_width(f['port'])-1}:0] {f['name']} = {f['port']};")
+    print()
 
+    # Initialize the loop counter
+    print("\n\tinteger _i_;")
 
-   # declare wires for the flags if the flag name is different than the port it is connected to
-   print()
-   for f in IP['flags']:
-       if f['name'] != f['port']:
-           print(f"\twire [{get_port_width(f['port'])-1}:0] {f['name']} = {f['port']};")
-   print()
+    # Check if RIS_REG is accessible, else skip the loop
+    print(f"\t`{bus_type}_BLOCK(RIS_REG, 0) else begin")
 
+    # Iterate over each flag in the IP dictionary
+    pos = 0
+    for f in IP['flags']:
+        # Iterate from 0 to the port width of the flag
+        print(f"\t\tfor(_i_ = {pos}; _i_ < {get_port_width(f['port'])+pos}; _i_ = _i_ + 1) begin")
 
-   # Initialize the loop counter
-   print("\n\tinteger _i_;")
+        # Update RIS_REG based on the condition
+        print(f"\t\t\tif(IC_REG[_i_]) RIS_REG[_i_] <= 1'b0; else if({f['name']}[_i_ - {pos}] == 1'b1) RIS_REG[_i_] <= 1'b1;")
 
+        # End the inner loop
+        print("\t\tend")
 
-   # Check if RIS_REG is accessible, else skip the loop
-   print(f"\t`{bus_type}_BLOCK(RIS_REG, 0) else begin")
+        pos += get_port_width(f['port'])
 
+    # End the outer loop
+    print("\tend")
 
-   # Iterate over each flag in the IP dictionary
-   pos = 0
-   for f in IP['flags']:
-
-
-       # Iterate from 0 to the port width of the flag
-       print(f"\t\tfor(_i_ = {pos}; _i_ < {get_port_width(f['port'])+pos}; _i_ = _i_ + 1) begin")
-
-
-       # Update RIS_REG based on the condition
-       print(f"\t\t\tif(IC_REG[_i_]) RIS_REG[_i_] <= 1'b0; else if({f['name']}[_i_ - {pos}] == 1'b1) RIS_REG[_i_] <= 1'b1;")
-
-
-       # End the inner loop
-       print("\t\tend")
-
-
-       pos += get_port_width(f['port'])
-
-
-   # End the outer loop
-   print("\tend")
-
-
-   # Add a newline for readability
-   print()
+    # Add a newline for readability
+    print()
 
 
 def print_IRQ_registers(bus_type):
