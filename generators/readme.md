@@ -1,10 +1,11 @@
 
 ## IP wrapper generator for AMBA APB and AHB Lite
 
-``amba_wrap.py ip.yml|ip.json -apb|-ahbl -tb|-ch|-md``
+``bus_wrap.py ip.yml|ip.json -apb|-ahbl|-wb -tb|-ch|-md``
 - Options:
     - `-apb` : generates an APB wrapper.
     - `-ahbl` : generates an AHB Lite wrapper.
+    - `-ahbl` : generates a WB wrapper.
     - `-tb` : generates a Verilog testbench for the generated bus wrapper.
     - `-ch` : generates a C header file containing the register definitions.
     - `-md` : generates documentation in MD and Bitfield formats.
@@ -24,22 +25,22 @@
 3. Generate the wrapper RTL by invoking: 
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-``amba_wrap.py ip.yml|ip.json -apb|-ahbl > ip_APB.v``
+``bus_wrap.py ip.yml|ip.json -apb|-ahbl > ip_APB.v``
 
 4. Genertate a template testbench.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-``amba_wrap.py ip.yml|ip.json -apb|-ahbl -tb > ip_APB_tb.v``
+``bus_wrap.py ip.yml|ip.json -apb|-ahbl -tb > ip_APB_tb.v``
 
 5. Generate the Register Definitions C header file needed for FW development.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-``amba_wrap.py ip.yml|ip.json -apb|-ahbl -ch > ip_APB.h``
+``bus_wrap.py ip.yml|ip.json -apb|-ahbl -ch > ip_APB.h``
 
 6. Generate an, almost, complete Markdown documentation of the IP. This includes register/fields tables as well as graphics for the register fields in the bitfield format.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-``amba_wrap.py ip.yml|ip.json -apb|-ahbl -md > ip_APB.md``
+``bus_wrap.py ip.yml|ip.json -apb|-ahbl -md > ip_APB.md``
 
 ## YAML IP Definition File Format
 
