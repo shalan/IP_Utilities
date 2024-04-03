@@ -118,51 +118,44 @@ def print_header(bus_type):
 
 
 def print_module_header(bus_type):
-   """
-   Prints the module header
+    """
+    Prints the header of the generated file for the specified bus type.
 
+    Parameters:
+        bus_type (str): The type of bus (e.g. APB, AHBL, WB).
 
-   If IP has an external interface, it prints the SLAVE_PORTS and the details of each interface.
-   If IP does not have an external interface, it only prints the SLAVE_PORTS.
+    Returns:
+        None
+    """
+    # Print module name
+    print(f"module {IP['info']['name']}_{bus_type}", end="")
 
+    if "parameters" in IP:
+        print(" #( \n\tparameter\t")
+        for index, p in enumerate(IP['parameters']):
+            print(f"\t\t{p['name']} = {p['default']}", end="")
+            if index != len(IP['parameters']) - 1:
+                print(",")
+        print("\n)", end="")
+    print(" (")
+    if "external_interface" in IP:
+        # Print {bus_type}_SLAVE_PORTS
+        print(f"\t`{bus_type}_SLAVE_PORTS,")
 
-   Args:
-       None
+        # Print details of each interface
+        for index, ifc in enumerate(IP['external_interface']):
+            if index != len(IP['external_interface']) - 1:
+                # Print interface details with comma
+                print(f"\t{ifc['direction']}\t[{ifc['width']-1}:0]\t{ifc['name']},")
+            else:
+                # Print interface details without comma
+                print(f"\t{ifc['direction']}\t[{ifc['width']-1}:0]\t{ifc['name']}")
+    else:
+        # Print only {bus_type}_SLAVE_PORTS
+        print("\t`{bus_type}_SLAVE_PORTS")
 
-
-   Returns:
-       None
-   """
-   # Print module name
-   print(f"module {IP['info']['name']}_{bus_type}", end="")
-
-   if "parameters" in IP:
-       print(" #( \n\tparameter\t")
-       for index, p in enumerate(IP['parameters']):
-           print(f"\t\t{p['name']} = {p['default']}", end="")
-           if index != len(IP['parameters']) - 1:
-               print(",")
-       print("\n)", end="")
-   print(" (")
-   if "external_interface" in IP:
-       # Print {bus_type}_SLAVE_PORTS
-       print(f"\t`{bus_type}_SLAVE_PORTS,")
-
-       # Print details of each interface
-       for index, ifc in enumerate(IP['external_interface']):
-           if index != len(IP['external_interface']) - 1:
-               # Print interface details with comma
-               print(f"\t{ifc['direction']}\t[{ifc['width']-1}:0]\t{ifc['name']},")
-           else:
-               # Print interface details without comma
-               print(f"\t{ifc['direction']}\t[{ifc['width']-1}:0]\t{ifc['name']}")
-   else:
-       # Print only {bus_type}_SLAVE_PORTS
-       print("\t`{bus_type}_SLAVE_PORTS")
-
-
-   # Print end of module header
-   print(");\n")
+    # Print end of module header
+    print(");\n")
   
 def print_wires(bus_type):
     """
@@ -185,10 +178,8 @@ def print_wires(bus_type):
         clk_net = "clk_i"
         rst_net = "(~rst_i)"
 
-
     # Print clock wire declaration
     print(f"\twire\t\t{IP['clock']['name']} = {clk_net};")
-
 
     # Check if reset is active and set the 'mod' variable accordingly
     if IP['reset']['level'] == 0:
@@ -753,8 +744,6 @@ def print_md_tables():
    print("```")
    #The port `ext_in` must be connected to an input I/O pad.
    print("> **_NOTE:_** `TB_APB_SLAVE_CONN is a convenient macro provided by [IP_Utilities](https://github.com/shalan/IP_Utilities).")
-
-
    print("\n## Implementation example  \n")
    print(f"The following table is the result for implementing the {IP['info']['name']} IP with different wrappers using Sky130 PDK and [yosys](https://github.com/YosysHQ/yosys).")
    print("|Module | Number of cells | Max. freq |")
@@ -893,13 +882,9 @@ def main():
     else:
         exit_with_message("You must specify a bus type using -apb or -ahbl option.")
 
-
     if ".yaml" not in args[0] and ".yml" not in args[0] and ".json" not in args[0]:
         exit_with_message("First argument must be an IP description file in YAML or JSON format.")
     
-    # self.data = json.load(jfile)
-
-
     if ".json" in args[0]:
         with open(args[0], "r") as jfile:
             try:
