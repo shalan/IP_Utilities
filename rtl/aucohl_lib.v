@@ -104,7 +104,7 @@ endmodule
 /*
     A glitch filter
 */
-module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
+module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 8'd1) (
     input   wire    clk,
     input   wire    rst_n,
     input   wire    in,
