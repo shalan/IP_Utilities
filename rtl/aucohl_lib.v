@@ -87,7 +87,7 @@ module aucohl_ticker #(parameter W=8) (
             else
                 counter <=  counter - 'b1; 
 
-    assign tick_w = (clk_div == 'b1)  ?   1'b1 : counter_is_zero;
+	assign tick_w = (clk_div == 'b0)  ?   1'b1 : counter_is_zero;
 
     always @(posedge clk or negedge rst_n)
         if(!rst_n)
@@ -108,6 +108,7 @@ module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
     input   wire    clk,
     input   wire    rst_n,
     input   wire    in,
+    input   wire    en,
     output  reg     out
 );
 
@@ -117,6 +118,7 @@ module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
     aucohl_ticker ticker (
         .clk(clk),
         .rst_n(rst_n),
+	.en(en),
         .clk_div(CLKDIV),
         .tick(tick)
     );
