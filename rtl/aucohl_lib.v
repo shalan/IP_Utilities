@@ -125,7 +125,7 @@ module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
 
     always @(posedge clk, negedge rst_n)
         if(!rst_n)
-            shifter = 'b0;
+            shifter <= 'b0;
         else if(tick)
             shifter <= {shifter[N-2:0], in};
 
