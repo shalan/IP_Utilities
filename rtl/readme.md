@@ -34,7 +34,7 @@ module aucohl_ned (
 ## aucohl_ticker
 A tick generator a periodic ``tick`` output which can be used to enable periodic operations at a rate slower than the clock frequency. For an example, a counter that is incremented every ``4`` clock cycles can use the ticker to generate a count enable signal every ``4`` clock cycle. 
 
-The input port ``clk_div`` minus ``1`` provides the clock frequency divisor to set the ``tick`` rate. The ticker can be enabled and disabled using `en` port.
+The input port ``clk_div`` plus ``1`` provides the clock frequency divisor to set the ``tick`` rate. The ticker can be enabled and disabled using `en` port.
 
 ```Verilog
 module aucohl_ticker #(parameter W=8) (
@@ -50,7 +50,7 @@ module aucohl_ticker #(parameter W=8) (
 Electrical or in some cases even mechanical interference can trigger an unwanted glitch pulses from the receiver. A glitch filter is used to remove unwanted pulses from a digital input signal that is usually high or low. 
 
 The glitch filter outputs a `1` only when the current and previous ``N`` samples (``N`` is a module parameter) are ``1``, and a ``0`` only when the current and previous ``N`` samples are ``0``. Otherwise the output is unchanged from its current value.
-The signal sampling rate is controlled by the ``CLKDIV`` parameter. The sampling rate is: $(clk frequency)/(CLKDIV-1)$.
+The signal sampling rate is controlled by the ``CLKDIV`` parameter. The sampling rate is: $(clk frequency)/(CLKDIV+1)$.
 
 ```Verilog
 module aucohl_glitch_filter #(parameter N = 8, CLKDIV = 1) (
