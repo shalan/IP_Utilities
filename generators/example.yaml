@@ -1,0 +1,194 @@
+info:
+  name: AUCOHL_CCC16
+  description: 16-bit Counter, Capture and Compare with a configurable glitch filter
+  repo: https://github.com/shalan/AUCOHL_CCC16.git
+  owner: AUCOHL
+  license: APACHE 2.0
+  author: Mohamed Shalan
+  email: mshalan@aucegypt.edu
+  version: 1.0
+  date: 15-01-2024
+  category: digital
+  tags:
+    - counter
+    - capture
+    - debouncing
+    - time measurement
+    - glitch filter
+  bus:
+    - generic
+  type: soft
+  status: verified
+  qualification: n/a
+  cell_count:
+    - 500
+  width: 0.0
+  height: 0.0
+  technology: n/a
+  clock_freq_mhz: 50MHz
+  digital_supply_voltage: n/a
+  analog_supply_voltage: n/a
+
+parameters:
+- name: NSS
+  default: 2
+  description: The input synchronizer number of stages
+
+# Remove the clock, reset and external interface ports from the following list
+ports:
+- name: prescaler
+  width: 16
+  direction: input
+  description: 
+- name: gf_len
+  width: 4
+  direction: input
+  description: 
+- name: gf_en
+  width: 1
+  direction: input
+  description: 
+- name: cntr_en
+  width: 1
+  direction: input
+  description: 
+- name: cntr_clr
+  width: 1
+  direction: input
+  description: 
+- name: tmr_en
+  width: 1
+  direction: input
+  description: 
+- name: cntr_event
+  width: 2
+  direction: input
+  description: 
+- name: cntr_cmp
+  width: 16
+  direction: input
+  description: 
+- name: cap_start_event
+  width: 2
+  direction: input
+  description: 
+- name: cap_stop_event
+  width: 2
+  direction: input
+  description: 
+- name: cntr_match
+  width: 1
+  direction: output
+  description: 
+- name: cap_done
+  width: 1
+  direction: output
+  description: 
+- name: capture
+  width: 16
+  direction: output
+  description: 
+
+clock:
+ name: clk
+
+reset:
+ name: rst_n
+ level: 0
+
+external_interface:
+- name: ext_in
+  port: in
+  direction: input
+  width: 1
+  description: 
+
+registers:
+- name: PR
+  size: 16
+  mode: w
+  fifo: no
+  offset: 0
+  bit_access: no
+  write_port: prescaler
+  description: The prescaler. The timer counts frequency is $clk freq/(PR+1)$
+- name: CCMP
+  size: 16
+  mode: w
+  fifo: no
+  offset: 4
+  bit_access: no
+  write_port: cntr_cmp
+  description: Counter Compare Register. The event counter is continuously compared to CCMP.
+- name: CAP
+  size: 16
+  mode: r
+  fifo: no
+  offset: 8
+  bit_access: no
+  read_port: capture
+  description: The captured value.
+- name: CTRL
+  size: 4
+  mode: w
+  fifo: no
+  offset: 12
+  bit_access: no
+  description: Control Register.
+  fields:
+  - name: TE
+    bit_offset: 0
+    bit_width: 1
+    write_port: tmr_en
+    description: Timer enable
+  - name: CE
+    bit_offset: 1
+    bit_width: 1
+    write_port: cntr_en
+    description: Counter enable
+  - name: GFE
+    bit_offset: 2
+    bit_width: 1
+    write_port: gf_en
+    description: Glitch Filter enable
+  - name: CCLR
+    bit_offset: 3
+    bit_width: 1
+    write_port: cntr_clr
+    description: Counter Clear.
+- name: CFG
+  size: 10
+  mode: w
+  fifo: no
+  offset: 16
+  bit_access: no
+  description: Configuration Register.
+  fields:
+  - name: GFL
+    bit_offset: 0
+    bit_width: 4
+    write_port: gf_len
+    description: Glitch Filter Length (4-8).
+  - name: CE
+    bit_offset: 4
+    bit_width: 2
+    write_port: cntr_event
+    description: "Counting Event; 01: Negative Edge, 10: Positive Edge, 11: Both Edges."
+  - name: CAPS
+    bit_offset: 6
+    bit_width: 2
+    write_port: cap_start_event
+    description: "Event to start capturing; 01: Negative Edge, 10: Positive Edge, 11: Both Edges."
+  - name: CAPE
+    bit_offset: 8
+    bit_width: 2
+    write_port: cap_stop_event
+    description: "Event to stop capturing; 01: Negative Edge, 10: Positive Edge, 11: Both Edges."
+
+flags:
+- name: CM
+  port: cntr_match
+  description: Counter match.
+- name: CAP
+  port: cap_done
+  description: Capture is done.
