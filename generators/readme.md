@@ -44,7 +44,7 @@
 
 ## YAML IP Definition File Format
 
-A YAML file is used to capture the IP information. This includes:
+A YAML file is used to capture the IP information for the sake of generating the RTL bus wrappers including I/O registers. This includes:
 
 ### General Information
 
@@ -79,7 +79,7 @@ info:
 
 ### Parameter Definitions
 
-This section is used if the IP RTL model is parameterized. The parameters defined in this section can be used in other sections to specify width of fields and registers.
+This section is used for soft digital IPs if the IP RTL model is parameterized. The parameters defined in this section can be used in other sections to specify the widths of fields and registers.
 
 ```YAML
 parameters:
@@ -94,7 +94,7 @@ parameters:
 ```
 ### Port Definitions
 
-IP Port definitions. For an example:
+IP Port definitions. The Verilog ports if it is a digital soft IP or the macro pins if hard macro. For an example:
 ```yaml
 ports:
   - name: "data_in"
@@ -107,7 +107,7 @@ ports:
     description: "The output data"
 ```
 ### External Interface Definitions
-IP External Interfaces to other sub-systems. For an example:
+IP External Interfaces to other sub-systems. In other words, the IP ports that pass through the bus wrapper to outside; typically, IP ports connected to I/Os. For an example:
 ```yaml
 external_interface: 
   - name: "i_pad_in"
