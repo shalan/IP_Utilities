@@ -37,7 +37,7 @@
                                                 end 
 `define     TB_APB_SIG                          reg PWRITE, PENABLE, PSEL; reg [31:0] PWDATA, PADDR; wire PREADY; wire [31:0] PRDATA; wire IRQ;
 `define     TB_AHBL_SIG                          reg HWRITE, HSEL; reg [2:0] HSIZE; reg [1:0] HTRANS; reg [31:0] HWDATA, HADDR; reg HREADY; wire HREADYOUT; wire [31:0] HRDATA; wire IRQ;
-`define     TB_WB_SIG                           reg clk_i, rst_i; reg cyc_i, stb_i, we_i; reg [3:0] sel_i; reg [31:0] adr_i, dat_i; wire ack_o; wire[31:0]  dat_o;
+`define     TB_WB_SIG                           reg cyc_i, stb_i, we_i; reg [3:0] sel_i; reg [31:0] adr_i, dat_i; wire ack_o; wire[31:0]  dat_o; wire IRQ;
 `define     TB_AHBL_SLAVE_CONN                   .HCLK(HCLK),\
                                                 .HRESETn(HRESETn),\
                                                 .HSEL(HSEL),\
