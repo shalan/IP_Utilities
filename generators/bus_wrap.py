@@ -466,22 +466,25 @@ def print_wb_dat_o(bus_type):
     print("\t\telse\n\t\t\tack_o <= 1'b0;")
 
 def print_fifos(bus_type):
-   if "fifos" in IP:
-       prefix = "last_H"
-       data = "HWDATA"
-       if bus_type == "APB":
-           prefix = "P"
-           data = "PWDATA"
+    if "fifos" in IP:
+        addr = "adr_i"
+        data = "dat_i"
+        if bus_type == "APB":
+            addr = "PADDR"
+            data = "PWDATA"
+        elif bus_type == "AHBL":
+            addr = "last_HADDR"
+            data = "HWDATA"
   
-       for f in IP["fifos"]:
-           rd = f"({bus_type.lower()}_re & ({prefix}ADDR[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
-           wr = f"({bus_type.lower()}_we & ({prefix}ADDR[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
-           if f['type'] == "write":
-               print(f"\tassign\t{f['data_port']} = {data};") #{f['register']}_WIRE;")
-               print(f"\tassign\t{f['control_port']} = {wr};")
-           else:
-               print(f"\tassign\t{f['register']}_WIRE = {f['data_port']};")
-               print(f"\tassign\t{f['control_port']} = {rd};")
+        for f in IP["fifos"]:
+            rd = f"({bus_type.lower()}_re & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            wr = f"({bus_type.lower()}_we & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            if f['type'] == "write":
+                print(f"\tassign\t{f['data_port']} = {data};") #{f['register']}_WIRE;")
+                print(f"\tassign\t{f['control_port']} = {wr};")
+            else:
+                print(f"\tassign\t{f['register']}_WIRE = {f['data_port']};")
+                print(f"\tassign\t{f['control_port']} = {rd};")
 
 def print_bus_wrapper(bus_type):
     print_license()
