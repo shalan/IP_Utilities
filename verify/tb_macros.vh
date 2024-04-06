@@ -60,7 +60,17 @@
                                                 .PRDATA(PRDATA),\
                                                 .IRQ(IRQ)
 
-
+`define     TB_WB_SLAVE_CONN                    .clk_i(clk_i), \
+                                                .rst_i(rst_i), \
+                                                .cyc_i(cyc_i), \
+                                                .stb_i(stb_i), \
+                                                .we_i(we_i), \ 
+                                                .sel_i(sel_i), \ 
+                                                .adr_i(adr_i), \ 
+                                                .dat_i(dat_i), \ 
+                                                .ack_o(ack_o), \ 
+                                                .dat_o(dat_o), \
+                                                .IRQ(IRQ)
                                                 
 
 

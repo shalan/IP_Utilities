@@ -531,71 +531,83 @@ def print_tb_reg_offsets(bus_type):
 
 
 def print_tb(bus_type):
-   print_license()
-   print(f"/* THIS FILE IS GENERATED, edit it to complete the testbench */\n")
-   print(f"`timescale\t\t1ns/1ps\n")
-   print(f"`default_nettype\tnone\n")
-   print(f"`define\t\t\t{bus_type}_AW\t\t\t{BUS_AW}")
-   print("`define\t\t\tMS_TB_SIMTIME\t\t1_000_000\n")
-   print(f"`include\t\t\"tb_macros.vh\"\n")
+    print_license()
+    print(f"/* THIS FILE IS GENERATED, edit it to complete the testbench */\n")
+    print(f"`timescale\t\t1ns/1ps\n")
+    print(f"`default_nettype\tnone\n")
+    print(f"`define\t\t\t{bus_type}_AW\t\t\t{BUS_AW}")
+    print("`define\t\t\tMS_TB_SIMTIME\t\t1_000_000\n")
+    print(f"`include\t\t\"tb_macros.vh\"\n")
 
 
-   print(f"module {IP['info']['name']}_{bus_type}_tb;\n")
+    print(f"module {IP['info']['name']}_{bus_type}_tb;\n")
 
 
-   print("\t// Change the following parameters as desired")
-   print("\tparameter real CLOCK_PERIOD = 100.0;")
-   print("\tparameter real RESET_DURATION = 999.0;\n")
-  
-   print("\t// DON NOT Change the following parameters")
-   print_tb_reg_offsets(bus_type)
+    print("\t// Change the following parameters as desired")
+    print("\tparameter real CLOCK_PERIOD = 100.0;")
+    print("\tparameter real RESET_DURATION = 999.0;\n")
+
+    print("\t// DON NOT Change the following parameters")
+    print_tb_reg_offsets(bus_type)
 
 
-   print(f"\t`TB_{bus_type}_SIG\n")
+    print(f"\t`TB_{bus_type}_SIG\n")
 
 
-   if IP["external_interface"]:
-       # Print details of each interface
-       for index, ifc in enumerate(IP['external_interface']):
-           if(ifc['direction'] == "input"):
-               print("\treg\t", end='')
-           else:
-               print("\twire\t", end='')
-           print(f"[{ifc['width']-1}:0]\t{ifc['name']};")
+    if IP["external_interface"]:
+        # Print details of each interface
+        for index, ifc in enumerate(IP['external_interface']):
+            if(ifc['direction'] == "input"):
+                print("\treg\t", end='')
+            else:
+                print("\twire\t", end='')
+            print(f"[{ifc['width']-1}:0]\t{ifc['name']};")
+
+    if bus_type == "AHBL":
+        clk = "HCLK"
+        rst = "HRESETn"
+        rst_pol = "1'b0"
+    elif bus_type == "APB":
+        clk = "PCLK"
+        rst = "PRESETn"
+        rst_pol = "1'b0"
+    elif bus_type == "WB":
+        clk = "clk_i"
+        rst = "rst_i"
+        rst_pol = "1'b1"
+
+    print(f"\n\t`TB_CLK({clk}, CLOCK_PERIOD)")
+    #print(f"\t`TB_SRSTN({'HRESETn' if bus_type == 'AHBL' else 'PRESETn'}, {'HCLK' if bus_type == 'AHBL' else 'PCLK'}, RESET_DURATION)")
+    print(f"\t`TB_ESRST({rst}, {rst_pol}, {clk}, RESET_DURATION)")
+    print(f"\t`TB_DUMP(\"{bus_type}_{IP['info']['name']}_tb.vcd\", {IP['info']['name']}_{bus_type}_tb, 0)")
+    print(f"\t`TB_FINISH(`MS_TB_SIMTIME)")
 
 
-   print(f"\n\t`TB_CLK({'HCLK' if bus_type == 'AHBL' else 'PCLK'}, CLOCK_PERIOD)")
-   #print(f"\t`TB_SRSTN({'HRESETn' if bus_type == 'AHBL' else 'PRESETn'}, {'HCLK' if bus_type == 'AHBL' else 'PCLK'}, RESET_DURATION)")
-   print(f"\t`TB_ESRST({'HRESETn' if bus_type == 'AHBL' else 'PRESETn'}, 1'b0, {'HCLK' if bus_type == 'AHBL' else 'PCLK'}, RESET_DURATION)")
-   print(f"\t`TB_DUMP(\"{bus_type}_{IP['info']['name']}_tb.vcd\", {IP['info']['name']}_{bus_type}_tb, 0)")
-   print(f"\t`TB_FINISH(`MS_TB_SIMTIME)")
+    print_tb_duv(bus_type)
 
 
-   print_tb_duv(bus_type)
+    print(f"\n\t`include \"{bus_type.lower()}_tasks.vh\"\n")
 
 
-   print(f"\n\t`include \"{bus_type.lower()}_tasks.vh\"\n")
+    print("\t`TB_TEST_EVENT(test1)\n")
+    print("\tinitial begin\n"
+            "\t\t#999 -> e_assert_reset;\n"
+            "\t\t@(e_reset_done);\n\n"
+            "\t\t// Perform Test 1\n"
+            "\t\t#1000 -> e_test1_start;\n"
+            "\t\t@(e_test1_done);\n\n"
+            "\t\t// Perform other tests\n\n"
+            "\t\t// Finish the simulation\n"
+            "\t\t#1000 $finish();\n"         
+            "\tend\n\n")
+        
+    print("\t// Test 1\n"
+            "\t`TB_TEST_BEGIN(test1)"
+            "\n\t\t// Test 1 code goes here\n"
+            "\n\t`TB_TEST_END(test1)")
 
 
-   print("\t`TB_TEST_EVENT(test1)\n")
-   print("\tinitial begin\n"
-         "\t\t#999 -> e_assert_reset;\n"
-         "\t\t@(e_reset_done);\n\n"
-         "\t\t// Perform Test 1\n"
-         "\t\t#1000 -> e_test1_start;\n"
-         "\t\t@(e_test1_done);\n\n"
-         "\t\t// Perform other tests\n\n"
-         "\t\t// Finish the simulation\n"
-         "\t\t#1000 $finish();\n"         
-         "\tend\n\n")
-      
-   print("\t// Test 1\n"
-         "\t`TB_TEST_BEGIN(test1)"
-         "\n\t\t// Test 1 code goes here\n"
-         "\n\t`TB_TEST_END(test1)")
-
-
-   print("endmodule")
+    print("endmodule")
 
 
 def print_reg_def():
