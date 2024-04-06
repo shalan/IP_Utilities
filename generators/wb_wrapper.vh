@@ -26,7 +26,7 @@
                                         wire[3:0]       wb_byte_sel = sel_i & {4{wb_we}};
 
 `define     WB_IC_REG(sz)               `WB_BLOCK(IC_REG, sz'b0) \
-                                        else if(wb_we & (adr_i[`WB_AW-1:0]==IC_REG_ADDR)) \
+                                        else if(wb_we & (adr_i[`WB_AW-1:0]==IC_REG_OFFSET)) \
                                             IC_REG <= dat_i[``sz``-1:0]; \
                                         else \ 
                                             IC_REG <= sz'd0;
