@@ -467,18 +467,20 @@ def print_wb_dat_o(bus_type):
 
 def print_fifos(bus_type):
     if "fifos" in IP:
-        addr = "adr_i"
-        data = "dat_i"
         if bus_type == "APB":
             addr = "PADDR"
             data = "PWDATA"
         elif bus_type == "AHBL":
             addr = "last_HADDR"
             data = "HWDATA"
+        elif bus_type == "WB":
+            addr = "adr_i"
+            data = "dat_i"
+            prefix = "ack_o & "
   
         for f in IP["fifos"]:
-            rd = f"({bus_type.lower()}_re & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
-            wr = f"({bus_type.lower()}_we & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            rd = f"({prefix}{bus_type.lower()}_re & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            wr = f"({prefix}{bus_type.lower()}_we & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
             if f['type'] == "write":
                 print(f"\tassign\t{f['data_port']} = {data};") #{f['register']}_WIRE;")
                 print(f"\tassign\t{f['control_port']} = {wr};")
