@@ -68,13 +68,23 @@ info:
     - generic
   type": "soft"
   status: "verified"
-  cell_count: "690"
-  width": "0.0"
-  height": "0.0"
+  cell_count: 
+    - IP: 797
+    - APB: 1435
+    - AHBL: 1501
+    - WB: 0
+  width": 0.0
+  height": 0.0
   technology: "n/a"
-  clock_freq_mhz: "10"
+  clock_freq_mhz:
+    - IP: 163
+    - APB: 135
+    - AHBL: 128
+    - WB: 0
   digital_supply_voltage: "n/a"
   analog_supply_voltage: "n/a"
+  static_power: 0.0,
+  dynamic_power: 0.0
   ```
 
 ### Parameter Definitions
@@ -107,7 +117,8 @@ ports:
     description: "The output data"
 ```
 ### External Interface Definitions
-IP External Interfaces to other sub-systems. In other words, the IP ports that pass through the bus wrapper to outside; typically, IP ports connected to I/Os. For an example:
+IP External Interfaces to other sub-systems. In other words, the IP ports that pass through the bus wrapper to outside the wrapper; typically, the IP ports connected to I/Os. For an example:
+
 ```yaml
 external_interface: 
   - name: "i_pad_in"
@@ -175,6 +186,12 @@ registers:
 - The ``fifo`` property is used to specify whether this register is used to access a FIFO. If it is set to ``yes`` the FIFO has to be defined.
 
 ### FIFO Definitions
+This section is used if the IP has data FIFOs. For each FIFO, you need to specify:
+- `type` : `read` (receive) or `write` (transmit)
+- The FIFO has `depth` number of words, each is `width` bits.
+- The `register` is used to access the FIFO in firmware
+- The `data_port` is used to provide the data to `write` FIFO or read the data from `read` FIFO.
+- The `control_port` is used to specify the ports used to control the FIFO read or write operations.
 
 ```yaml
 fifos:
@@ -191,12 +208,6 @@ fifos:
     data_port: wdata
     control_port: wr
 ```
-This section is used if the IP has data FIFOs. For each FIFO, you need to specify:
-- `type` : `read` (receive) or `write` (transmit)
-- `width` and `depth`
-- The `register` is used to access the FIFO in firmware
-- The `data_port` is used to provide the data to `write` FIFO or read the data from `read` FIFO.
-- The `control_port` is used to specify the ports used to control the FIFO read or write operations.
 
 ### Event Flags Definitions
 Event flags are used for generating interrupts. For an example:
@@ -210,4 +221,5 @@ flags:
   port: cap_done
   description: Capture is done.
 ```
+The bus wrapper generator generates four different registers to manage interrupts: ``RIS`` (Raw Interrupt Status), ``IM`` (Interrupt Mask), ``MIS`` (Masked Interrupt Status) and ``IC`` (Interrupt Clear). Each bit in each represents one of the flags.
 
