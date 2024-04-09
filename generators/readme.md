@@ -94,7 +94,7 @@ parameters:
 ```
 ### Port Definitions
 
-IP Port definitions. The Verilog ports if it is a digital soft IP or the macro pins if hard macro. For an example:
+IP Port definitions. The Verilog ports it is a digital soft IP or the macro pins if hard macro. For an example:
 ```yaml
 ports:
   - name: "data_in"
@@ -133,6 +133,7 @@ reset:
   level: 0
 ```
 
+`level`: determines the edge, 0: negative, 1: positive
 ### Register Definitions
 
 Register definitions. For an example:
@@ -147,7 +148,7 @@ registers:
   read_port: capture
   description: The captured value.
 - name: CTRL
-  size: 4
+  size: 2
   mode: w
   fifo: no
   offset: 12
@@ -168,9 +169,9 @@ registers:
 - The ``mode`` property can be set to: 
   - ``w`` for registers that are meant for writing only; reading from it returns the last written data value.
   - ``r`` for registers that are meant for reading only; hence they cannot be written. 
-  - ``rw`` for registers that are read and written differently; for an example, the data register of a GPIO peripheral. Reading this register returns the data provided on input GPIO pins and writting the register sets the values of output GPIO pins.
+  - ``rw`` for registers that are read and written differently; for example, the data register of a GPIO peripheral. Reading this register returns the data provided on input GPIO pins and writing the register sets the values of output GPIO pins.
 
-- The ``bit_access`` property is used to enable bit level access (Not implemented functionality).
+- The ``bit_access`` property is used to enable bit-level access (Not implemented functionality).
 - The ``fifo`` property is used to specify whether this register is used to access a FIFO. If it is set to ``yes`` the FIFO has to be defined.
 
 ### FIFO Definitions
@@ -190,11 +191,15 @@ fifos:
     data_port: wdata
     control_port: wr
 ```
+This section is used if the IP has data FIFOs. For each FIFO, you need to specify:
+- `type` : `read` (receive) or `write` (transmit)
+- `width` and `depth`
+- The `register` is used to access the FIFO in firmware
+- The `data_port` is used to provide the data to `write` FIFO or read the data from `read` FIFO.
+- The `control_port` is used to specify the ports used to control the FIFO read or write operations.
 
-
-### Event Flag Definitions
-
-Event flags used for generating interrupts. For an example:
+### Event Flags Definitions
+Event flags are used for generating interrupts. For an example:
 
 ```yaml
 flags:
