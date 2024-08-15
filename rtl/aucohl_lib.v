@@ -58,11 +58,14 @@ endmodule
     A negative edge detector
 */
 module aucohl_ned (
-    input clk,
-    input in,
-    output out
+    input wire clk,
+    input wire in,
+    output wire out
 );
-    `NED(clk, in, out)
+    reg last_in; 
+    always @(posedge clk) 
+        last_in <= in;
+    assign out = ~in & last_in;
 endmodule
 
 /*
