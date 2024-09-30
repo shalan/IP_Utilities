@@ -445,6 +445,9 @@ module aucohl_clkmux_4x1 (
     
 endmodule
 
+/*
+Clocking Gating Cell
+*/
 module ef_gating_cell(
     `ifdef USE_POWER_PINS 
     input   wire    vpwr,
