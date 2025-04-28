@@ -1,6 +1,5 @@
 """
-Copyright (c) 2020 AUCOHL
-
+   Copyright (c) 2020 AUCOHL
 
    Author: Mohamed Shalan (mshalan@aucegypt.edu)
   
@@ -8,9 +7,7 @@ Copyright (c) 2020 AUCOHL
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at:
 
-
    http://www.apache.org/licenses/LICENSE-2.0
-
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,25 +23,31 @@ Copyright (c) 2020 AUCOHL
 
 
 import sys
-#import os.path
+import math
 import yaml
 import json
+import copy
 
+IP  =   None
 
-IP          = None
-
-
-# COnfigurations to be loaded from a configuration file
-BUS_AW      = 16
-INT_REG_OFF = 0x0F00
-
+# Configurations to be loaded from a configuration file
+BUS_AW          = 16
+INT_REG_OFF     = 0xFF00
+FIFO_REG_OFF    = 0xFE00
+BIT_BAND_OFF    = 0xE000
+BYTE_BAND_OFF   = 0xD000
+CLK_GATE_OFF    = INT_REG_OFF + 0x10
 
 # Interrupt registers offsets
-IC_OFF      = 0x0C + INT_REG_OFF
-RIS_OFF     = 0x08 + INT_REG_OFF
-IM_OFF      = 0x00 + INT_REG_OFF
-MIS_OFF     = 0x04 + INT_REG_OFF
+IC_OFF          = 0x0C + INT_REG_OFF
+RIS_OFF         = 0x08 + INT_REG_OFF
+IM_OFF          = 0x00 + INT_REG_OFF
+MIS_OFF         = 0x04 + INT_REG_OFF
 
+# FIFO register offsets
+FLUSH_OFF       = 0x8 + FIFO_REG_OFF
+THRESHOLD_OFF   = 0x4 + FIFO_REG_OFF
+LEVEL_OFF       = 0x0 + FIFO_REG_OFF
 
 def print_license():
    print(f"/*\n\tCopyright {IP['info']['date'].split('-')[2]} {IP['info']['owner']}\n")
@@ -72,7 +75,7 @@ def print_license():
        print("\tLicensed under the Apache License, Version 2.0 (the \"License\");")
        print("\tyou may not use this file except in compliance with the License.")
        print("\tYou may obtain a copy of the License at\n")
-       print("\t    http://www.apache.org/licenses/LICENSE-2.0\n")
+       print("\t    www.apache.org/licenses/LICENSE-2.0\n")
        print("\tUnless required by applicable law or agreed to in writing, software")
        print("\tdistributed under the License is distributed on an \"AS IS\" BASIS,")
        print("\tWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.")
@@ -116,7 +119,7 @@ def print_header(bus_type):
    print(f"`include\t\t\t\"{bus_type.lower()}_wrapper.vh\"\n")  
 
 
-def print_module_header(bus_type):
+def print_module_header(bus_type, is_dft=False):
     """
     Prints the header of the generated file for the specified bus type.
 
@@ -139,24 +142,36 @@ def print_module_header(bus_type):
     print(" (")
     if "external_interface" in IP:
         # Print {bus_type}_SLAVE_PORTS
+        print ("`ifdef USE_POWER_PINS") 
+        print ("\tinout VPWR,") 
+        print ("\tinout VGND,") 
+        print ("`endif") 
+        if is_dft:
+            print(f"\tinput\twire\tsc_testmode,")
         print(f"\t`{bus_type}_SLAVE_PORTS,")
 
         # Print details of each interface
         for index, ifc in enumerate(IP['external_interface']):
             if index != len(IP['external_interface']) - 1:
                 # Print interface details with comma
-                print(f"\t{ifc['direction']}\t[{ifc['width']-1}:0]\t{ifc['name']},")
+                print(f"\t{ifc['direction']}\twire\t[{ifc['width']}-1:0]\t{ifc['name']},")
             else:
                 # Print interface details without comma
-                print(f"\t{ifc['direction']}\t[{ifc['width']-1}:0]\t{ifc['name']}")
+                print(f"\t{ifc['direction']}\twire\t[{ifc['width']}-1:0]\t{ifc['name']}")
     else:
         # Print only {bus_type}_SLAVE_PORTS
-        print("\t`{bus_type}_SLAVE_PORTS")
+        print ("`ifdef USE_POWER_PINS") 
+        print ("\tinout VPWR,") 
+        print ("\tinout VGND,") 
+        print ("`endif") 
+        if is_dft:
+            print(f"\tinput\twire\tsc_testmode,")
+        print(f"\t`{bus_type}_SLAVE_PORTS")
 
     # Print end of module header
     print(");\n")
   
-def print_wires(bus_type):
+def print_wires(bus_type, is_dft=False):
     """
     Print the wire declarations for the given IP.
 
@@ -180,8 +195,25 @@ def print_wires(bus_type):
         clk_net = "clk_i"
         rst_net = "(~rst_i)"
 
+    # print the clock gating cell
+    clkgatecell = f"""
+    reg [0:0] GCLK_REG;
+    wire clk_g;
+
+    wire clk_gated_en = {"" if not is_dft else "sc_testmode ? 1'b1 : "}GCLK_REG[0];
+    ef_util_gating_cell clk_gate_cell(
+        `ifdef USE_POWER_PINS 
+        .vpwr(VPWR),
+        .vgnd(VGND),
+        `endif // USE_POWER_PINS
+        .clk({clk_net}),
+        .clk_en(clk_gated_en),
+        .clk_o(clk_g)
+    );
+    """
+    print(clkgatecell)
     # Print clock wire declaration
-    print(f"\twire\t\t{IP['clock']['name']} = {clk_net};")
+    print(f"\twire\t\t{IP['clock']['name']} = clk_g;") #{clk_net};")
 
     # Check if reset is active and set the 'mod' variable accordingly
     if IP['reset']['level'] == 0:
@@ -203,7 +235,7 @@ def print_wires(bus_type):
 
     #print("")
   
-def print_instance_to_wrap():
+def print_instance_to_wrap(bus_type):
     """
     Print the instance to wrap by formatting the IP dictionary.
 
@@ -213,6 +245,16 @@ def print_instance_to_wrap():
     Returns:
         None
     """
+
+    # Generate synchronizers for input interfaces if needed
+    if "external_interface" in IP:
+        for index, ifc in enumerate(IP['external_interface']):
+            if "sync" in ifc:
+                if ifc["sync"] == True:
+                    if ifc["direction"] != "input":
+                        raise sys.exit("You cannot attach a synchronizer to non-input interface")
+                    print_synchronizer(bus_type, ifc['name'], ifc['port'], ifc['width'], 2)
+
     if "parameters" in IP:
         print(f"\t{IP['info']['name']} #(")
         for index, p in enumerate(IP['parameters']):
@@ -230,15 +272,48 @@ def print_instance_to_wrap():
             print(f"\t\t.{p['name']}({p['name']}),")
         else:
             print(f"\t\t.{p['name']}({p['name']})")
+    
     if "external_interface" in IP:
         for index, ifc in enumerate(IP['external_interface']):
+            port = f"{ifc['name']}"
+            if "sync" in ifc:
+                if ifc['sync'] == True:
+                    port = f"_{ifc['port']}_w_"
+            
             if index != len(IP['external_interface']) - 1:
-                print(f"\t\t.{ifc['port']}({ifc['name']}),")
+                print(f"\t\t.{ifc['port']}({port}),")
             else:
-                print(f"\t\t.{ifc['port']}({ifc['name']})")
+                print(f"\t\t.{ifc['port']}({port})")
     print("\t);\n")
 
+def print_synchronizer(bus_type, name, port, width, stages):
+    if bus_type == "AHBL":
+        clk = "HCLK"
+        rst = "HRESETn"
+        pol = 0
+    elif bus_type == "APB":
+        clk = "PCLK"
+        rst = "PRESETn"
+        pol = 0
+    elif bus_type == "WB":
+        clk = "clk_i"
+        rst = "rst_i"
+        pol = 1
+    
+    clock_edge = "posedge" if pol == 1 else "negedge"
 
+    print(f"\treg [{width-1}:0]\t_{name}_reg_[{stages-1}:0];")
+    print(f"\twire\t\t_{port}_w_ = _{name}_reg_[{stages-1}];")
+    print(f"\talways@(posedge {clk} or {clock_edge} {rst})")
+    print(f"\t\tif({rst} == {pol}) begin")
+    for i in range(stages):
+        print(f"\t\t\t_{name}_reg_[{i}] <= 'b0;")
+    print(f"\t\tend")
+    print(f"\t\telse begin")
+    print(f"\t\t\t_{name}_reg_[0] <= {name};")
+    for i in range(stages-1):
+        print(f"\t\t\t_{name}_reg_[{i+1}] <= _{name}_reg_[{i}];")
+    print(f"\t\tend")
 
 
 def print_registers(bus_type):
@@ -251,13 +326,50 @@ def print_registers(bus_type):
     Returns:
         None
     """
-    if IP['registers'] is False:
+
+    """
+    if "fifos" in IP:
+        print("\t// FIFO Registers")
+        for f in IP['fifos']:
+            # fifo_aw = int(math.log2(f["depth"]))
+            fifo_aw = f['address_width']
+            fifo_name = f"{f['name'].upper()}";
+            print(f"\t// {fifo_name} Registers")
+            print(f"\treg\t[{fifo_aw}-1:0]\t{fifo_name}_THRESHOLD_REG;")
+            print(f"\tassign\t\t{f['threshold_port']} = {fifo_name}_THRESHOLD_REG;")
+            print(f"\t`{bus_type}_REG({fifo_name}_THRESHOLD_REG, 0, {fifo_aw})")
+            print(f"\twire\t[{fifo_aw}-1:0]\t{fifo_name}_LEVEL_REG;")
+            print(f"\tassign\t\t{fifo_name}_LEVEL_REG = {f['level_port']};")
+            if f["flush_enable"] == True:
+                flush_reg_name = f"{fifo_name}_FLUSH_REG";
+                print(f"\treg\t\t{flush_reg_name};")
+                print(f"\t`{bus_type}_AUTO_CLR_REG({flush_reg_name}, 0, 1)")
+                print(f"\tassign\t\t{f['flush_port']} = {flush_reg_name};")
+            print("")
+    print("")
+    """
+    if "registers" not in IP:
         return
-            
-    for r in IP['registers']:    
+
+    print("\t// Register Definitions")
+    
+    for r in IP['registers']:
+        byte_access = 0
+        if "byte_access" in r:
+            if r['byte_access'] == 1:
+                byte_access = 1
+                if r['size'] != 32:
+                    exit_with_message("Byte addressing is available only for 32-bit registers!")
+                elif bus_type != "APB":
+                    exit_with_message("Byte addressing is available only for APB wrappers!")
+
         if r['fifo'] is True:
-            print(f"\twire\t[{r['size']}-1:0]\t{r['name']}_WIRE;")
+            if "r" in r['mode']:
+                print(f"\twire\t[{r['size']}-1:0]\t{r['name']}_WIRE;")
         else:
+            if "auto_clear" in r:
+                if r['mode'] != 'w':
+                    exit_with_message(f"The auto_clear property cannot be True for a '{r['mode']}' filed") 
             if r['mode'] == 'rw':
                 # 'rw' registers cannot have field
                 print(f"\treg\t[{r['size']}-1:0]\t{r['name']}_REG;")
@@ -266,7 +378,13 @@ def print_registers(bus_type):
                 print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
                 print(f"\t`{bus_type}_REG({r['name']}_REG, 0, 8)")
             elif r['mode'] == 'w':
-                print(f"\treg [{r['size']}-1:0]\t{r['name']}_REG;")
+                if f"{r['size']}".isnumeric():
+                    rsz = r['size']-1
+                else:
+                    rsz = f"{r['size']}-1"
+                print(f"\treg [{rsz}:0]\t{r['name']}_REG;")
+                f_indx = 0
+                update_pattern = 0
                 if "fields" in r and "write_port" not in r:
                     for f in r['fields']:
                         if isinstance(f['bit_width'], int):
@@ -277,9 +395,24 @@ def print_registers(bus_type):
                             else:
                                 to = f"({f['bit_width']} + {f['bit_offset'] - 1})"
                         print(f"\tassign\t{f['write_port']}\t=\t{r['name']}_REG[{to} : {f['bit_offset']}];")
+                        if "auto_clear" in f:
+                            #print(f["auto_clear"])
+                            if f["auto_clear"] == True:
+                                update_pattern = update_pattern | (1 << f_indx)
+                                #print(update_pattern)
+                        f_indx = f_indx + 1
+                    #print(f"{(~update_pattern & (1<<r['size'])-1):x}")
                 else:
                     print(f"\tassign\t{r['write_port']} = {r['name']}_REG;")
-                print(f"\t`{bus_type}_REG({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']})")
+                if update_pattern !=0 :
+                    pat = f"{r['size']}'h{(~update_pattern & (1<<r['size'])-1):x}"
+                    print(f"\t`{bus_type}_REG_AC({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']}, {pat})")
+                else:
+                    if byte_access == 0:
+                        print(f"\t`{bus_type}_REG({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']})")
+                    else:
+                        print(f"\t`{bus_type}_REG_BYTE({r['name']}_REG, {r['init'] if 'init' in r else 0}, {r['size']})")
+
             elif r['mode'] == 'r':
                 print(f"\twire [{r['size']}-1:0]\t{r['name']}_WIRE;")
                 if "fields" in r:
@@ -390,34 +523,50 @@ def print_IRQ_registers(bus_type):
     print(f"\tassign IRQ = |MIS_REG;")
     print()
 
+def print_GCLK_register(bus_type):
+    print(f"\tlocalparam\tGCLK_REG_OFFSET = `{bus_type}_AW'h{hex(CLK_GATE_OFF)[2:].zfill(4).upper()};")
+    print(f"\t`{bus_type}_REG(GCLK_REG, 0, 1)")
+    print()
 
 def print_registers_offsets(bus_type):
-   """
-   Print the register offsets for the given IP.
+    """
+    Print the register offsets for the given IP.
 
 
-   Args:
-       None
+    Args:
+        None
 
 
-   Returns:
-       None
-   """
-   # user defined registers
-   for r in IP['registers']:
-       print(f"\tlocalparam\t{r['name']}_REG_OFFSET = `{bus_type}_AW'd{r['offset']};")
+    Returns:
+        None
+    """
 
+    # user defined registers
+    if "registers" in IP:
+        for r in IP['registers']:
+            print(f"\tlocalparam\t{r['name']}_REG_OFFSET = `{bus_type}_AW'h{hex(r['offset'])[2:].zfill(4).upper()};")
 
-   # Interrupt registers
-   print(f"\tlocalparam\tIM_REG_OFFSET = `{bus_type}_AW'd{IM_OFF};")
-   print(f"\tlocalparam\tMIS_REG_OFFSET = `{bus_type}_AW'd{MIS_OFF};")
-   print(f"\tlocalparam\tRIS_REG_OFFSET = `{bus_type}_AW'd{RIS_OFF};")
-   print(f"\tlocalparam\tIC_REG_OFFSET = `{bus_type}_AW'd{IC_OFF};")
-              
-   print("")
+    # Interrupt registers
+    if "flags" in IP:
+        print(f"\tlocalparam\tIM_REG_OFFSET = `{bus_type}_AW'h{hex(IM_OFF)[2:].zfill(4).upper()};")
+        print(f"\tlocalparam\tMIS_REG_OFFSET = `{bus_type}_AW'h{hex(MIS_OFF)[2:].zfill(4).upper()};")
+        print(f"\tlocalparam\tRIS_REG_OFFSET = `{bus_type}_AW'h{hex(RIS_OFF)[2:].zfill(4).upper()};")
+        print(f"\tlocalparam\tIC_REG_OFFSET = `{bus_type}_AW'h{hex(IC_OFF)[2:].zfill(4).upper()};")
 
+    """
+    # Fifo Registers
+    if "fifos" in IP:
+        f_indx = 0
+        for f in IP['fifos']:
+            print(f"\tlocalparam\t{f['name'].upper()}_FLUSH_REG_OFFSET = `{bus_type}_AW'd{FLUSH_OFF + 0x10 * f_indx};")
+            print(f"\tlocalparam\t{f['name'].upper()}_THRESHOLD_REG_OFFSET = `{bus_type}_AW'd{THRESHOLD_OFF + 0x10 * f_indx};")
+            print(f"\tlocalparam\t{f['name'].upper()}_LEVEL_REG_OFFSET = `{bus_type}_AW'd{LEVEL_OFF + 0x10 * f_indx};")
+            f_indx = f_indx + 1
+               
+    print("")
+    """
 def print_rdata(bus_type):
-    IRQ_REGS = ["IM", "MIS", "RIS", "IC"]
+    IRQ_REGS = ["IM", "MIS", "RIS"]
     prefix = "last_H"
     if bus_type == "APB":
         prefix = "P"
@@ -426,14 +575,24 @@ def print_rdata(bus_type):
         print(f"\tassign\tHRDATA = ")
     
     for index,r in enumerate(IP['registers']):
-        if "r" in r['mode'] or r['fifo'] is True:
-            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
+        if  r['fifo'] is True or "r" in r['mode']:
+            if "r" in r['mode']:
+                print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
         else:
             print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_REG :")
     
     if "flags" in IP:
         for r in IRQ_REGS:
             print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {r}_REG_OFFSET)\t? {r}_REG :")
+    print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == GCLK_REG_OFFSET)\t? GCLK_REG :")
+    """
+    if "fifos" in IP:
+        for f in IP["fifos"]:
+            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {f['name'].upper()}_LEVEL_REG_OFFSET)\t? {f['name'].upper()}_LEVEL_REG :")
+            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {f['name'].upper()}_THRESHOLD_REG_OFFSET)\t? {f['name'].upper()}_THRESHOLD_REG :")
+            print(f"\t\t\t({prefix}ADDR[`{bus_type}_AW-1:0] == {f['name'].upper()}_FLUSH_REG_OFFSET)\t? {f['name'].upper()}_FLUSH_REG :")
+
+    """
     
     print("\t\t\t32'hDEADBEEF;")
     
@@ -449,13 +608,21 @@ def print_wb_dat_o(bus_type):
 
     for index,r in enumerate(IP['registers']):
         if "r" in r['mode'] or r['fifo'] is True:
-            print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
+            if "r" in r['mode']:
+                print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_WIRE :")
         else:
             print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {r['name']}_REG_OFFSET)\t? {r['name']}_REG :")
 
     if "flags" in IP:
         for r in IRQ_REGS:
             print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {r}_REG_OFFSET)\t? {r}_REG :")
+    """
+    if "fifos" in IP:
+        for f in IP["fifos"]:
+            print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {f['name'].upper()}_LEVEL_REG_OFFSET)\t? {f['name'].upper()}_LEVEL_REG :")
+            print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {f['name'].upper()}_THRESHOLD_REG_OFFSET)\t? {f['name'].upper()}_THRESHOLD_REG :")
+            print(f"\t\t\t(adr_i[`{bus_type}_AW-1:0] == {f['name'].upper()}_FLUSH_REG_OFFSET)\t? {f['name'].upper()}_FLUSH_REG :")
+    """
 
     print("\t\t\t32'hDEADBEEF;")
 
@@ -467,20 +634,22 @@ def print_wb_dat_o(bus_type):
 
 def print_fifos(bus_type):
     if "fifos" in IP:
+        addr = "adr_i"
+        data = "dat_i"
         if bus_type == "APB":
             addr = "PADDR"
             data = "PWDATA"
         elif bus_type == "AHBL":
             addr = "last_HADDR"
             data = "HWDATA"
-        elif bus_type == "WB":
-            addr = "adr_i"
-            data = "dat_i"
-            prefix = "ack_o & "
   
         for f in IP["fifos"]:
-            rd = f"({prefix}{bus_type.lower()}_re & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
-            wr = f"({prefix}{bus_type.lower()}_we & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            if bus_type == "WB":
+                rd = f" ack_o & ({bus_type.lower()}_re & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+                wr = f"ack_o & ({bus_type.lower()}_we & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+            else:
+                rd = f"({bus_type.lower()}_re & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
+                wr = f"({bus_type.lower()}_we & ({addr}[`{bus_type}_AW-1:0] == {f['register']}_REG_OFFSET))"
             if f['type'] == "write":
                 print(f"\tassign\t{f['data_port']} = {data};") #{f['register']}_WIRE;")
                 print(f"\tassign\t{f['control_port']} = {wr};")
@@ -488,16 +657,17 @@ def print_fifos(bus_type):
                 print(f"\tassign\t{f['register']}_WIRE = {f['data_port']};")
                 print(f"\tassign\t{f['control_port']} = {rd};")
 
-def print_bus_wrapper(bus_type):
+def print_bus_wrapper(bus_type, is_dft=False):
     print_license()
     print_header(bus_type)
-    print_module_header(bus_type)
+    print_module_header(bus_type, is_dft)
     print_registers_offsets(bus_type)
-    print_wires(bus_type)
+    print_wires(bus_type, is_dft)
     print_registers(bus_type)
+    print_GCLK_register(bus_type)
     if "flags" in IP:
         print_IRQ_registers(bus_type)
-    print_instance_to_wrap()
+    print_instance_to_wrap(bus_type)
     if bus_type == "WB":
         print_wb_dat_o(bus_type)
     else:
@@ -613,67 +783,153 @@ def print_tb(bus_type):
 
 
 def print_reg_def():
-   ip_name = IP['info']['name'].upper()
-   off = 0
-   print_license()
-   print(f"#ifndef {ip_name}REGS_H")
-   print(f"#define {ip_name}REGS_H\n")
-   print("#ifndef IO_TYPES")
-   print("#define IO_TYPES")
-   print("#define   __R     volatile const unsigned int")
-   print("#define   __W     volatile       unsigned int")
-   print("#define   __RW    volatile       unsigned int")
-   print("#endif\n")
+    ip_name = IP['info']['name'].upper()
+    print_license()
+    print(f"#ifndef {ip_name}REGS_H")
+    print(f"#define {ip_name}REGS_H\n")
+    print(''' 
+/******************************************************************************
+* Includes
+******************************************************************************/
+#include <stdint.h>
+
+/******************************************************************************
+* Macros and Constants
+******************************************************************************/
+''')
+
+    print("#ifndef IO_TYPES")
+    print("#define IO_TYPES")
+    print("#define   __R     volatile const uint32_t")
+    print("#define   __W     volatile       uint32_t")
+    print("#define   __RW    volatile       uint32_t")
+    print("#endif\n")
+
+    for r in IP["registers"]:
+        if "fields" in r:
+            for f in r["fields"]:
+                if not isinstance(f['bit_width'], int):
+                    width = get_param_default(f['bit_width'])
+                else:
+                    width = f['bit_width']
+                print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_BIT\t((uint32_t){f['bit_offset']})")
+
+                mask = hex((2**width - 1) << f['bit_offset'])
+                print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_MASK\t((uint32_t){mask})")
+        else:
+            # If there are no fields in the register, then the register should have a single feild
+            # The field should have the name of the register
+            # The field should have a mask corresponding to the size of the register
+            # The bit offset should be 0
+            if not isinstance(r['size'], int):
+                size = get_param_default(r['size'])
+            else:
+                size = r['size']
+            
+            field_name = r['name']  
+            mask = hex((2**size - 1))
+            
+            print(f"#define {ip_name}_{r['name'].upper()}_REG_{field_name.upper()}_BIT\t((uint32_t)0)")
+            print(f"#define {ip_name}_{r['name'].upper()}_REG_{field_name.upper()}_MASK\t((uint32_t){mask})")
+            
+                
+        if "size" in r:
+            if not isinstance(r['size'], int):
+                size = get_param_default(r['size'])
+            else:
+                size= r['size']
+                
+            max_register_value = (2** size) -1
+            print(f"#define {ip_name}_{r['name'].upper()}_REG_MAX_VALUE\t((uint32_t)0x{max_register_value:X})\n")
+
+            
+    print()   
+    
+    # Add Int Registers fields
+    if "flags" in IP:
+        c = 0;
+        #fcnt = len(self.ip.data["flags"])
+        for flag in IP["flags"]:
+            w = get_port_width(flag["port"])
+            if isinstance(w, int):
+                width = w
+            else:
+                width = get_param_default(w)
+            pattern = (2**width - 1) << c
+            print(f"#define {ip_name}_{flag['name'].upper()}_FLAG\t((uint32_t){hex(pattern)})")
+
+            c = c + width
+
+    print()
+    
+    print('''
+          
+/******************************************************************************
+* Typedefs and Enums
+******************************************************************************/
+          ''')
+
+    print(f"typedef struct _{ip_name}_TYPE_ "+"{")
+    off = 0
+    g = 0
+    for index, r in enumerate(IP["registers"]):
+        #print(f"{off} - {r['offset']}")
+        if r['offset'] != off:
+            gap_size = int((r['offset'] - off)/4)
+            off = r['offset'] 
+            print(f"\t__R \treserved_{g}[{gap_size}];")
+            g = g + 1
+        reg_type = "__RW"
+        if r["mode"] == "r":
+            reg_type = "__R "
+        elif r["mode"] == "w":
+            reg_type = "__W "
+        print(f"\t{reg_type}\t{r['name']};")
+        off = off + 4
+
+    #print(f"{off} - {INT_REG_OFF}")
+    if "flags" in IP:
+        reserved_size = int((INT_REG_OFF - off)/4)
+        print(f"\t__R \treserved_{g}[{(reserved_size)}];")
+        print("\t__RW\tIM;")
+        print("\t__R \tMIS;")
+        print("\t__R \tRIS;")
+        print("\t__W \tIC;")
+
+    if IP['clock']['gated']=='yes':
+        if "flags" not in IP:
+            reserved_size = int((CLK_GATE_OFF - off)/4)
+            print(f"\t__R \treserved_{g}[{(reserved_size)}];")
+    
+        print("\t__W \tGCLK;")
+        
+    print("}", end="")
+    print(f" {ip_name}_TYPE;")
+    
+    print(f"\ntypedef struct _{ip_name}_TYPE_ *{ip_name}_TYPE_PTR;     // Pointer to the register structure")
+    print('''
   
-   for r in IP["registers"]:
-       if "fields" in r:
-           for f in r["fields"]:
-               if not isinstance(f['bit_width'], int):
-                   width = get_param_default(f['bit_width'])
-               else:
-                   width = f['bit_width']
-               print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_BIT\t{f['bit_offset']}")
-               mask = hex((2**width - 1) << f['bit_offset'])
-               print(f"#define {ip_name}_{r['name'].upper()}_REG_{f['name'].upper()}_MASK\t{mask}")
+/******************************************************************************
+* Function Prototypes
+******************************************************************************/
 
 
-   print()   
-   # add Int Registers fields
-   if "flags" in IP:
-       c = 0;
-       #fcnt = len(self.ip.data["flags"])
-       for flag in IP["flags"]:
-           w = get_port_width(flag["port"])
-           if isinstance(w, int):
-               width = w
-           else:
-               width = get_param_default(w)
-           pattern = (2**width - 1) << c
-           print(f"#define {ip_name}_{flag['name'].upper()}_FLAG\t{hex(pattern)}")
-           c = c + width
+
+/******************************************************************************
+* External Variables
+******************************************************************************/
 
 
-   print()
 
 
-   print(f"typedef struct _{ip_name}_TYPE_ "+"{")
-   for index, r in enumerate(IP["registers"]):
-       reg_type = "__RW"
-       if r["mode"] == "r":
-           reg_type = "__R "
-       elif r["mode"] == "w":
-           reg_type = "__W "
-       print(f"\t{reg_type}\t{r['name']};")
-       off = off + 4
-   reserved_size = int((INT_REG_OFF - off)/4)
-   print(f"\t__R \treserved[{(reserved_size)}];")
-   print("\t__RW\tim;")
-   print("\t__R \tmis;")
-   print("\t__R \tris;")
-   print("\t__W \ticr;")
-   print("}", end="")
-   print(f" {ip_name}_TYPE;")
-   print("\n#endif\n")
+#endif
+
+/******************************************************************************
+* End of File
+******************************************************************************/
+          
+          ''')
+
 
 
 """
@@ -734,123 +990,302 @@ def print_reg_bf(r):
 
 
 def print_md_tables():
+   # Description
+   # The Wrapped IP
+   # Implementation Example
+   # Programing Interface
+   #   Registers
+   #   Interrupt Flags 
+   #   Interface
+   #       Module Parameters
+   #       Ports
+   #   APIs
+   # F/W Usage Guidelines
+   # Installation
+   # Simulation
 
-   print(f"# {IP['info']['name']}\n")
-   print(f"{IP['info']['description']}")
-   print("## The wrapped IP\n")
-   print("\n APB and AHBL wrappers, generated by the [IP_Utilities](https://github.com/shalan/IP_Utilities) `amba_wrap.py` utility, is provided. WB wrapper will be provided soon. All wrappers provide the same programmer's interface as outlined in the following sections.")
-   print("\n### Wrapped IP System Integration\n")
-   print("Based on your use case, use one of the provided wrappers or create a wrapper for your system bus type. For an example of how to integrate the APB wrapper:")
-   print("```verilog")
-   print(f"{IP['info']['name']}_APB INST (")
-   print("\t`TB_APB_SLAVE_CONN,")
-   if "external_interface" in IP:
-       for ei in IP["external_interface"]:
-           print(f"\t.{ei['name']}({ei['name']})")
-   print(");")
-   print("```")
-   #The port `ext_in` must be connected to an input I/O pad.
-   print("> **_NOTE:_** `TB_APB_SLAVE_CONN is a convenient macro provided by [IP_Utilities](https://github.com/shalan/IP_Utilities).")
-   print("\n## Implementation example  \n")
-   print(f"The following table is the result for implementing the {IP['info']['name']} IP with different wrappers using Sky130 PDK and [yosys](https://github.com/YosysHQ/yosys).")
-   print("|Module | Number of cells | Max. freq |")
-   print("|---|---|---|")
-   print(f"|{IP['info']['name']}|||")
-   print(f"|{IP['info']['name']}_APB|||")
-   print(f"|{IP['info']['name']}_AHBL|||")
-   print(f"|{IP['info']['name']}_WB|||")
-  
-   print("## The Programming Interface\n")
+    print(f"# {IP['info']['name']}\n")
+    print(f"{IP['info']['description']}")
+    print("## The wrapped IP\n")    
+    if (IP['info']['bus'][0]=='generic'):
+        print("\n APB, AHBL, and Wishbone wrappers are provided. All wrappers provide the same programmer's interface as outlined in the following sections.")
+        print("\n### Wrapped IP System Integration\n")
+        print("Based on your use case, use one of the provided wrappers or create a wrapper for your system bus type. For an example of how to integrate the wishbone wrapper:")
+        print("```verilog")
+        print(f"{IP['info']['name']}_WB INST (")
+        print("\t.clk_i(clk_i),")
+        print("\t.rst_i(rst_i),")
+        print("\t.adr_i(adr_i),")
+        print("\t.dat_i(dat_i),")
+        print("\t.dat_o(dat_o),")
+        print("\t.sel_i(sel_i),")
+        print("\t.cyc_i(cyc_i),")
+        print("\t.stb_i(stb_i),")
+        print("\t.ack_o(ack_o),")
+        print("\t.we_i(we_i), ")
+        print("\t.IRQ(irq),")
+        if "external_interface" in IP:
+            for index, ei in enumerate(IP["external_interface"]):
+                if index != len(IP['external_interface']) - 1:
+                    print(f"\t.{ei['name']}({ei['name']}),")
+                else:
+                    print(f"\t.{ei['name']}({ei['name']})")
+        print(");")
+        print("```")
+        #The port `ext_in` must be connected to an input I/O pad.
+    elif (IP['info']['bus'][0]=='APB'):
+        print("\n The IP comes with an APB Wrapper")
+        print("\n#### Wrapped IP System Integration\n")
+        print("```verilog")
+        print(f"{IP['info']['name']}_APB INST (")
+        print("\t`TB_APB_SLAVE_CONN,")
+        if "external_interface" in IP:
+            for ei in IP["external_interface"]:
+                print(f"\t.{ei['name']}({ei['name']})")
+        print(");")
+        print("```")
+        print("> **_NOTE:_** `TB_APB_SLAVE_CONN is a convenient macro provided by [BusWrap](https://github.com/efabless/BusWrap/tree/main).")
+    elif (IP['info']['bus'][0]=='AHBL'):
+        print("\n The IP comes with an AHBL Wrapper")
+        print("\n#### Wrapped IP System Integration\n")
+        print("```verilog")
+        print(f"{IP['info']['name']}_APB INST (")
+        print("\t`TB_AHBL_SLAVE_CONN,")
+        if "external_interface" in IP:
+            for ei in IP["external_interface"]:
+                print(f"\t.{ei['name']}({ei['name']})")
+        print(");")
+        print("```")
+        print("> **_NOTE:_** `TB_APB_SLAVE_CONN is a convenient macro provided by [BusWrap](https://github.com/efabless/BusWrap/tree/main).")
 
-   print("\n### Registers\n")
+    print("### Wrappers with DFT support")
+    print("Wrappers in the directory ``/hdl/rtl/bus_wrappers/DFT`` have an extra input port ``sc_testmode`` to disable the clock gate whenever the scan chain testmode is enabled.")
 
-   print("|Name|Offset|Reset Value|Access Mode|Description|")
-   print("|---|---|---|---|---|")
-   for r in IP["registers"]:
-       if isinstance(r["size"], int):
-           size = int(r["size"])
-       else:
-           size = get_param_default(r["size"])
-       if "init" in r:
-           reset_value = '0x' + r["init"].strip("'h?").zfill(8)
-       else:
-           reset_value = "0x00000000"
-       print("|{0}|{1}|{2}|{3}|{4}|".format(r["name"], hex(r["offset"])[2:].zfill(4), reset_value, r["mode"], r["description"]))
-   if "flags" in IP:
-       print("|{0}|{1}|{2}|{3}|{4}|".format("IM", hex(IM_OFF)[2:].zfill(4), "0x00000000", "w", "Interrupt Mask Register; write 1/0 to enable/disable interrupts; check the interrupt flags table for more details"))
-       print("|{0}|{1}|{2}|{3}|{4}|".format("RIS", hex(RIS_OFF)[2:].zfill(4), "0x00000000", "w", "Raw Interrupt Status; reflects the current interrupts status;check the interrupt flags table for more details"))
-       print("|{0}|{1}|{2}|{3}|{4}|".format("MIS", hex(MIS_OFF)[2:].zfill(4), "0x00000000", "w", "Masked Interrupt Status; On a read, this register gives the current masked status value of the corresponding interrupt. A write has no effect; check the interrupt flags table for more details"))
-       print("|{0}|{1}|{2}|{3}|{4}|".format("IC", hex(IC_OFF)[2:].zfill(4), "0x00000000", "w", "Interrupt Clear Register; On a write of 1, the corresponding interrupt (both raw interrupt and masked interrupt, if enabled) is cleared; check the interrupt flags table for more details"))
+    if "external_interface" in IP:
+        print("### External IO interfaces")
+        print("|IO name|Direction|Width|Description|")
+        print("|---|---|---|---|")
+        for port in IP["external_interface"]:
+            print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")      
+
+    print("### Interrupt Request Line (irq)")
+    print ("This IP generates interrupts on specific events, which are described in the [Interrupt Flags](#interrupt-flags) section bellow. The IRQ port should be connected to the system interrupt controller.")
+
+    print("\n## Implementation example  \n")
+    print(f"The following table is the result for implementing the {IP['info']['name']} IP with different wrappers using Sky130 HD library and [OpenLane2](https://github.com/efabless/openlane2) flow.")
+    print("|Module | Number of cells | Max. freq |")
+    print("|---|---|---|")
+    if (IP['info']['bus'][0]=='generic'):
+        print(f"|{IP['info']['name']}|{IP['info']['cell_count'][0]['IP']}| {IP['info']['clock_freq_mhz'][0]['IP']} |")
+        print(f"|{IP['info']['name']}_APB|{IP['info']['cell_count'][1]['APB']}|{IP['info']['clock_freq_mhz'][1]['APB']}|")
+        print(f"|{IP['info']['name']}_AHBL|{IP['info']['cell_count'][2]['AHBL']}|{IP['info']['clock_freq_mhz'][2]['AHBL']}|")
+        print(f"|{IP['info']['name']}_WB|{IP['info']['cell_count'][3]['WB']}|{IP['info']['clock_freq_mhz'][3]['WB']}|")
+    elif (IP['info']['bus'][0]=='APB'):
+        print(f"|{IP['info']['name']}|{IP['info']['cell_count'][0]['IP']}| {IP['info']['clock_freq_mhz'][0]['IP']} |")
+        print(f"|{IP['info']['name']}_APB|{IP['info']['cell_count'][1]['APB']}|{IP['info']['clock_freq_mhz'][1]['APB']}|")
+    elif (IP['info']['bus'][0]=='AHBL'):
+        print(f"|{IP['info']['name']}|{IP['info']['cell_count'][0]['IP']}| {IP['info']['clock_freq_mhz'][0]['IP']} |")
+        print(f"|{IP['info']['name']}_AHBL|{IP['info']['cell_count'][1]['AHBL']}|{IP['info']['clock_freq_mhz'][1]['AHBL']}|")
+    elif (IP['info']['bus'][0]=='WB'):
+        print(f"|{IP['info']['name']}|{IP['info']['cell_count'][0]['IP']}| {IP['info']['clock_freq_mhz'][0]['IP']} |")
+        print(f"|{IP['info']['name']}_WB|{IP['info']['cell_count'][1]['WB']}|{IP['info']['clock_freq_mhz'][1]['WB']}|")
+
+    if "registers" in IP:
+
+        print("## The Programmer's Interface\n")
+        print("\n### Registers\n")
+
+        print("|Name|Offset|Reset Value|Access Mode|Description|")
+        print("|---|---|---|---|---|")
+        for r in IP["registers"]:
+            if isinstance(r["size"], int):
+                size = int(r["size"])
+            else:
+                size = get_param_default(r["size"])
+            if "init" in r:
+                reset_value = '0x' + r["init"].strip("'h?").zfill(8)
+            else:
+                reset_value = "0x00000000"
+            print("|{0}|{1}|{2}|{3}|{4}|".format(r["name"], hex(r["offset"])[2:].zfill(4), reset_value, r["mode"], r["description"]))
+    """
+    if "fifos" in IP:
+        f_indx = 0
+        for f in IP["fifos"]:
+            print("|{0}|{1}|{2}|{3}|{4}|".format(f"{f['name'].upper()}_LEVEL", hex(LEVEL_OFF + 0x10 * f_indx)[2:].zfill(4), "0x00000000", "r", f"{f['name'].upper()} level register."))
+            print("|{0}|{1}|{2}|{3}|{4}|".format(f"{f['name'].upper()}_THRESHOLD", hex(THRESHOLD_OFF + 0x10 * f_indx)[2:].zfill(4), "0x00000000", "w", f"{f['name'].upper()} level threshold register."))
+            print("|{0}|{1}|{2}|{3}|{4}|".format(f"{f['name'].upper()}_FLUSH", hex(FLUSH_OFF + 0x10 * f_indx)[2:].zfill(4),f"{f['name'].upper()}_FLUSH", "0x00000000", "w", f"{f['name'].upper()} flush register."))
+            f_indx = f_indx + 1
+    """
+    if "flags" in IP:
+        print("|{0}|{1}|{2}|{3}|{4}|".format("IM", hex(IM_OFF)[2:].zfill(4), "0x00000000", "w", "Interrupt Mask Register; write 1/0 to enable/disable interrupts; check the interrupt flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("RIS", hex(RIS_OFF)[2:].zfill(4), "0x00000000", "w", "Raw Interrupt Status; reflects the current interrupts status;check the interrupt flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("MIS", hex(MIS_OFF)[2:].zfill(4), "0x00000000", "w", "Masked Interrupt Status; On a read, this register gives the current masked status value of the corresponding interrupt. A write has no effect; check the interrupt flags table for more details"))
+        print("|{0}|{1}|{2}|{3}|{4}|".format("IC", hex(IC_OFF)[2:].zfill(4), "0x00000000", "w", "Interrupt Clear Register; On a write of 1, the corresponding interrupt (both raw interrupt and masked interrupt, if enabled) is cleared; check the interrupt flags table for more details"))
+ 
+    if IP['clock']['gated']=='yes':
+        print("|{0}|{1}|{2}|{3}|{4}|".format("GCLK", hex(CLK_GATE_OFF)[2:].zfill(4), "0x00000000", "w", "Gated clock enable; 1: enable clock, 0: disable clock"))
 
 
-   for r in IP["registers"]:
-       print(f"\n### {r['name']} Register [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
-       print(f"\n{r['description']}")
-       print_reg_bf(r)
-       if "fields" in r:
-           print("\n|bit|field name|width|description|")
-           print("|---|---|---|---|")
-           for f in r["fields"]:
-               if isinstance(f["bit_width"], int):
-                   width = int(f["bit_width"])
-               else:
-                   width = get_param_default(f["bit_width"])
-               print("|{0}|{1}|{2}|{3}|".format(f["bit_offset"], f["name"], width, f["description"]))
-       print()
-      
-   if "flags" in IP:
-       c = 0;
-       print("\n### Interrupt Flags\n")
-       print("The wrapped IP provides four registers to deal with interrupts: IM, RIS, MIS and IC. These registers exist for all wrapper types generated by the [IP_Utilities](https://github.com/shalan/IP_Utilities) `amba_wrap.py` utility. \n\nEach register has a group of bits for the interrupt sources/flags.")
-       print("- `IM`: is used to enable/disable interrupt sources.\n")
-       print("- `RIS`: has the current interrupt status (interrupt flags) whether they are enabled or disabled.\n")
-       print("- `MIS`: is the result of masking (ANDing) RIS by IM.\n")
-       print("- `IC`: is used to clear an interrupt flag.\n")
-       print("\nThe following are the bit definitions for the interrupt registers:\n")
-       print("|Bit|Flag|Width|Description|")
-       print("|---|---|---|---|")
-       for flag in IP["flags"]:
-           width = get_port_width(flag["port"])
-           if isinstance(width, int):
-               w = width
-           else:
-               w = get_param_default(width)
-           print(f"|{c}|{flag['name'].upper()}|{w}|{flag['description']}|")
-           c += w
+    if "registers" in IP:
+        for r in IP["registers"]:
+            print(f"\n### {r['name']} Register [Offset: {hex(r['offset'])}, mode: {r['mode']}]")
+            print(f"\n{r['description']}")
+            print_reg_bf(r)
+            if "fields" in r:
+                print("\n|bit|field name|width|description|")
+                print("|---|---|---|---|")
+                for f in r["fields"]:
+                    if isinstance(f["bit_width"], int):
+                        width = int(f["bit_width"])
+                    else:
+                        width = get_param_default(f["bit_width"])
+                    print("|{0}|{1}|{2}|{3}|".format(f["bit_offset"], f["name"], width, f["description"]))
+    
+    if IP['clock']['gated']=='yes':
+        print(f"\n### GCLK Register [Offset: {hex(CLK_GATE_OFF)}, mode: w]")
+        print(f"\n Gated clock enable register")
+        print("<img src=\"https://svg.wavedrom.com/{reg:[", end="")
+        size = 1    
+        print(f"{{name:'gclk_enable', bits:{size}}},", end="")
+        print(f"{{bits: {32-size}}}" , end="")
+        print("], config: {lanes: 2, hflip: true}} \"/>")
+        print("\n|bit|field name|width|description|")
+        print("|---|---|---|---|")
+        print("|{0}|{1}|{2}|{3}|".format("0", "gclk_enable", "1", "Gated clock enable; 1: enable clock, 0: disable clock"))
+    print()
 
+    """"    
+    if "fifos" in IP:
+        f_indx = 0
+        fields = [{'name':"", 'bit_offset':0, 'description':"", 'bit_width':0}]
+        fifo_reg = {"name":"", "size":0, "fields":fields}
+        for f in IP["fifos"]:
+            print(f"\n### {f['name'].upper()}_LEVEL Register [Offset: {hex(LEVEL_OFF + + 0x10 * f_indx)}, mode: r]")
+            fifo_reg['name'] = "{f['name'].upper()}_LEVEL}"
+            fifo_reg['size'] = f['address_width']
+            fields[0]['name'] = "level"
+            fields[0]['bit_offset'] = 0
+            fields[0]['bit_width'] = f['address_width']
+            fields[0]['description'] = "FIFO data level"
+            fifo_reg['fields'] = fields
+            print_reg_bf(fifo_reg)
+            print(f"\n### {f['name'].upper()}_THRESHOLD Register [Offset: {hex(THRESHOLD_OFF + + 0x10 * f_indx)}, mode: w]")
+            fifo_reg['name'] = "{f['name'].upper()}_THRESHOLD}"
+            fifo_reg['size'] = 1
+            fields[0]['bit_width'] = 1
+            fields[0]['description'] = "FIFO level threshold value"
+            fifo_reg['fields'] = fields
+            print_reg_bf(fifo_reg)
+            print(f"\n### {f['name'].upper()}_FLUSH Register [Offset: {hex(FLUSH_OFF + + 0x10 * f_indx)}, mode: w]")
+            fifo_reg['name'] = "{f['name'].upper()}_FLUSH}"
+            fifo_reg['size'] = 1
+            fields[0]['bit_width'] = 1
+            fields[0]['description'] = "FIFO flush"
+            fifo_reg['fields'] = fields
+            print_reg_bf(fifo_reg)
+            f_indx = f_indx + 1
+    """
+    if "flags" in IP:
+        c = 0;
+        print("\n### Interrupt Flags\n")
+        print("The wrapped IP provides four registers to deal with interrupts: IM, RIS, MIS and IC. These registers exist for all wrapper types.\n\nEach register has a group of bits for the interrupt sources/flags.")
+        print(f"- `IM` [offset: ``{hex(IM_OFF)}``]: is used to enable/disable interrupt sources.\n")
+        print(f"- `RIS` [offset: ``{hex(RIS_OFF)}``]: has the current interrupt status (interrupt flags) whether they are enabled or disabled.\n")
+        print(f"- `MIS` [offset: ``{hex(MIS_OFF)}``]: is the result of masking (ANDing) RIS by IM.\n")
+        print(f"- `IC` [offset: ``{hex(IC_OFF)}``]: is used to clear an interrupt flag.\n")
+        print("\nThe following are the bit definitions for the interrupt registers:\n")
+        print("|Bit|Flag|Width|Description|")
+        print("|---|---|---|---|")
+        for flag in IP["flags"]:
+            width = get_port_width(flag["port"])
+            if isinstance(width, int):
+                w = width
+            else:
+                w = get_param_default(width)
+            print(f"|{c}|{flag['name'].upper()}|{w}|{flag['description']}|")
+            c += w
 
-   print("\n### The Interface \n")
-  
-   if "parameters" in IP:
-       print("\n#### Module Parameters \n")
-       print("|Parameter|Description|Default Value|")
-       print("|---|---|---|")      
-       for parameter in IP["parameters"]:
-           print(f"|{parameter['name']}|{parameter['description']}|{parameter['default']}|")
-  
-   print("\n#### Ports \n")
-   print("|Port|Direction|Width|Description|")
-   print("|---|---|---|---|")
-   for port in IP["external_interface"]:
-       print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")      
-   for port in IP["ports"]:
-       print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")
-  
-   print ("## F/W Usage Guidelines:")
+    if IP['clock']['gated']=='yes': 
+        print("### Clock Gating")
+        print("The IP includes a clock gating feature that allows selective activation and deactivation of the clock using the ``GCLK`` register. This capability is implemented through the ``ef_util_gating_cell`` module, which is part of the common modules library, [ef_util_lib.v](https://github.com/efabless/EF_IP_UTIL/blob/main/hdl/ef_util_lib.v). By default, the clock gating is disabled. To enable behavioral implmentation clock gating, only for simulation purposes, you should define the ``CLKG_GENERIC`` macro. Alternatively, define the ``CLKG_SKY130_HD`` macro if you wish to use the SKY130 HD library clock gating cell, ``sky130_fd_sc_hd__dlclkp_4``.")
+        print("")
+        print("**Note:** If you choose the [OpenLane2](https://github.com/efabless/openlane2) flow for implementation and would like to enable the clock gating feature, you need to add ``CLKG_SKY130_HD`` macro to the ``VERILOG_DEFINES`` configuration variable. Update OpenLane2 YAML configuration file as follows: ")
+        print("```")
+        print("VERILOG_DEFINES:") 
+        print("- CLKG_SKY130_HD")
+        print("```")
 
-   print ("## Installation:")
-   print ("You can either clone repo or use [IPM](https://github.com/efabless/IPM) which is an open-source IPs Package Manager")
-   print ("* To clone repo:")
-   print(f"```git clone https://{IP['info']['repo']}```")
-   print("* To download via IPM , follow installation guides [here](https://github.com/efabless/IPM/blob/main/README.md) then run ")
-   print(f"```ipm install {IP['info']['name']}```")
+    
 
-   print ("## Simulation:")
-   print ("### Run Verilog Testbench:")
-   print ("1. Clone [IP_Utilities](https://github.com/shalan/IP_Utilities) repo in the same directory as the IP")
-   print (f"2. In the directory ``{IP['info']['name']}/verify/utb/`` run ``make APB-RTL`` to run testbench for APB or ``make AHBL-RTL`` to run testbench for AHBL")
-   print ("### Run cocotb UVM Testbench:")
-   print ("TBD")
+    # if "firmware_guidelines" in IP['info']:
+    #     print ("## F/W Usage Guidelines:")
+    #     print (IP['info']['firmware_guidelines'])
+
+    # print("## Drivers Documentation:")
+    # print(f"Driver documentation for {IP['info']['name']} is available [here](https://github.com/efabless/{IP['info']['name']}/blob/main/fw/README.md).")
+    # print(f"You can also find a C example application using {IP['info']['name']} drivers [here]().")
+    ip_name = IP["info"]["name"].lstrip("EF_")
+    print("## Firmware Drivers:")
+    print(f'Firmware drivers for {IP["info"]["name"]} can be found in the [Drivers](https://github.com/efabless/EFIS/tree/main/Drivers) directory in the [EFIS](https://github.com/efabless/EFIS) (Efabless Firmware Interface Standard) repo. {IP["info"]["name"]} driver documentation  is available [here](https://github.com/efabless/EFIS/blob/main/Drivers/Docs/{IP["info"]["name"]}/README.md).')
+    print(f'You can also find an example C application using the {IP["info"]["name"]} drivers [here](https://github.com/efabless/EFIS/tree/main/Drivers/Docs/{IP["info"]["name"]}/example).')
+
+    print("## Installation:")
+    print("You can install the IP either by cloning this repository or by using [IPM](https://github.com/efabless/IPM).")
+    print("### 1. Using [IPM](https://github.com/efabless/IPM):")
+    print("- [Optional] If you do not have IPM installed, follow the installation guide [here](https://github.com/efabless/IPM/blob/main/README.md)")
+    print(f'- After installing IPM, execute the following command ```ipm install {IP["info"]["name"]}```.')
+    print("> **Note:** This method is recommended as it automatically installs [EF_IP_UTIL](https://github.com/efabless/EF_IP_UTIL.git) as a dependency.")
+    print("### 2. Cloning this repo: ")
+    print("- Clone [EF_IP_UTIL](https://github.com/efabless/EF_IP_UTIL.git) repository, which includes the required modules from the common modules library, [ef_util_lib.v](https://github.com/efabless/EF_IP_UTIL/blob/main/hdl/ef_util_lib.v).")
+    print("```git clone https://github.com/efabless/EF_IP_UTIL.git```")
+    print("- Clone the IP repository")
+    print(f"```git clone {IP['info']['repo']}```")
+    
+    print("\n### The Wrapped IP Interface \n")
+    print(">**_NOTE:_** This section is intended for advanced users who wish to gain more information about the interface of the wrapped IP, in case they want to create their own wrappers.")
+    print("")
+    print(f'<img src="docs/_static/{IP["info"]["name"]}.svg" width="600"/>')
+
+    if "parameters" in IP:
+        print("\n#### Module Parameters \n")
+        print("|Parameter|Description|Default Value|")
+        print("|---|---|---|")      
+        for parameter in IP["parameters"]:
+            print(f"|{parameter['name']}|{parameter['description']}|{parameter['default']}|")
+
+    if "ports" or "external_interface" in IP:
+        print("\n#### Ports \n")
+        print("|Port|Direction|Width|Description|")
+        print("|---|---|---|---|")
+        if "external_interface" in IP:
+            for port in IP["external_interface"]:
+                print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")      
+        if "ports" in IP:
+            for port in IP["ports"]:
+                print(f"|{port['name']}|{port['direction']}|{port['width']}|{port['description']}|")
+
+    print ("## Run cocotb UVM Testbench:")
+    print ("In IP directory run:")
+    print (" ```shell")
+    print (" cd verify/uvm-python/")
+    print (" ```")
+    print (" ##### To run testbench for design with certain bus type ")
+    print (" To run all tests:")
+    print (" ```shell")
+    print (" make run_all_tests BUS_TYPE=<bus_type>")                    
+    print (" ```")
+    print (" To run a certain test:")
+    print (" ```shell")
+    print (" make run_<test_name> BUS_TYPE=<bus_type>")
+    print (" ```")
+    print (" To run all tests with a tag: ")
+    print (" ```shell")
+    print (" make run_all_tests TAG=<new_tag> BUS_TYPE=<bus_type>")
+    print (" ```")
+    
+    if "References" in IP['info']:
+        print("# References:\n")
+        print(IP['info']['References'])
           
       
 def print_help():
@@ -860,6 +1295,7 @@ def print_help():
    print("\t-ahbl: generate AHBL wrapper")
    print("\t-tb  : generate a Verilog testbench for the generated bus wrapper")
    print("\t-ch  : generate a C header file containing the register definitions")
+   print("\t-dft  : generate wrapper for dft")
    print("Arguments:")
    print("\tip.yml: A YAML file that contains the IP definition")
 
@@ -868,6 +1304,69 @@ def exit_with_message(msg):
    print(msg)
    sys.exit(f"Usage: {sys.argv[0]} ip.yml|ip.json -apb|-ahbl|-wb -tb|-ch|-md")   
 
+def process_fifos():
+    level_fields = [{'name':"level", 'bit_offset':0, 'description':"FIFO Level", 'bit_width':0, 'bit_access':"no"}]
+    fifo_level_reg = {"name":"level", "size":0, 'description': "", 'fifo':"no", 'read_port':"", 'fields':level_fields}
+
+    threshold_fields = [{'name':"threshold", 'bit_offset':0, 'description':"FIFO Level Threshold", 'bit_width':0, 'bit_access':"no"}]
+    fifo_threshold_reg = {"name":"threshold", "size":0, 'description': "", 'fifo':"no", "fields":threshold_fields}
+
+    flush_fields = [{'name':"flush", 'bit_offset':0, 'description':"FIFO Flush", 'bit_width':0, 'bit_access':"no"}]
+    fifo_flush_reg = {"name":"flush", "size":0, 'fifo':"no", "fields":flush_fields}
+
+    f_indx = 0
+        
+    if "fifos" in IP:
+        for f in IP["fifos"]:
+            fifo_level_reg['name'] = f"{f['name'].upper()}_LEVEL"
+            fifo_level_reg['size'] = f['address_width']
+            fifo_level_reg['mode'] = "r"
+            fifo_level_reg['bit_access'] = "no"
+            fifo_level_reg['offset'] = LEVEL_OFF + 0x10 * f_indx
+            fifo_level_reg['description'] = f"{f['name'].upper()} Level Register"
+            level_fields[0]['name'] = "level"
+            level_fields[0]['bit_offset'] = 0
+            level_fields[0]['bit_width'] = f['address_width']
+            level_fields[0]['description'] = "FIFO data level"
+            level_fields[0]['read_port'] = f['level_port'] 
+            fifo_level_reg['fields'] = level_fields
+            #print(type(IP['registers']))
+            x = dict()
+            x = copy.deepcopy(fifo_level_reg)
+            IP['registers'].append(x)
+
+            fifo_threshold_reg['name'] = f"{f['name'].upper()}_THRESHOLD"
+            fifo_threshold_reg['size'] = f['address_width']
+            fifo_threshold_reg['mode'] = "w"
+            #fifo_threshold_reg['write_port'] = f['threshold_port'] 
+            fifo_threshold_reg['offset'] = THRESHOLD_OFF + 0x10 * f_indx
+            fifo_threshold_reg['description'] = f"{f['name'].upper()} Level Threshold Register"
+            threshold_fields[0]['bit_width'] = f['address_width']
+            threshold_fields[0]['description'] = "FIFO level threshold value"
+            threshold_fields[0]['write_port'] = f['threshold_port'] 
+            fifo_threshold_reg['fields'] = threshold_fields
+            x = dict()
+            x = copy.deepcopy(fifo_threshold_reg)
+            IP['registers'].append(x)
+
+            fifo_flush_reg['name'] = f"{f['name'].upper()}_FLUSH"
+            fifo_flush_reg['size'] = 1
+            fifo_flush_reg['mode'] = "w"
+            #fifo_flush_reg['write_port'] = f['flush_port']
+            fifo_flush_reg['offset'] = FLUSH_OFF + + 0x10 * f_indx
+            fifo_flush_reg['description'] = f"{f['name'].upper()} Flush Register"
+            flush_fields[0]['bit_width'] = 1
+            flush_fields[0]['description'] = "FIFO flush"
+            flush_fields[0]['auto_clear'] = True
+            flush_fields[0]['write_port'] = f['flush_port']
+            fifo_flush_reg['fields'] = flush_fields
+            x = dict()
+            x = copy.deepcopy(fifo_flush_reg)
+            IP['registers'].append(x)
+            
+            #print(fifo_flush_reg['offset'])
+
+            f_indx = f_indx + 1
 
 def main():
     global IP
@@ -885,9 +1384,9 @@ def main():
         bus_type = "AHBL"
     elif "-wb" in opts:   
         bus_type = "WB"
-        
     else:
-        exit_with_message("You must specify a bus type using -apb or -ahbl option.")
+        if  "-md" not in opts and "-ch" not in opts:
+            exit_with_message("You must specify a bus type using -wb, -apb or -ahbl option.")
 
     if ".yaml" not in args[0] and ".yml" not in args[0] and ".json" not in args[0]:
         exit_with_message("First argument must be an IP description file in YAML or JSON format.")
@@ -905,6 +1404,24 @@ def main():
             except Exception:
                 raise sys.exit("Error loading the YAML file! Please check the file for syntax errors; you may use yamllint for this.")
 
+    # set the offset for the irq and fifo registers
+    if "irq_reg_offset" in IP['info']:
+        INT_REG_OFF = IP['info']['irq_reg_offset']
+        IC_OFF          = 0x0C + INT_REG_OFF
+        RIS_OFF         = 0x08 + INT_REG_OFF
+        IM_OFF          = 0x00 + INT_REG_OFF
+        MIS_OFF         = 0x04 + INT_REG_OFF
+    if "fifo_reg_offset" in IP['info']:
+        FIFO_REG_OFF = IP['info']['fifo_reg_offset']
+        FLUSH_OFF       = 0x8 + FIFO_REG_OFF
+        THRESHOLD_OFF   = 0x4 + FIFO_REG_OFF
+        LEVEL_OFF       = 0x0 + FIFO_REG_OFF    
+
+    process_fifos()
+    IP['registers'].sort(key=lambda reg: reg['offset'], reverse=False)
+    
+    #orig_list.sort(key=lmbda x: x.count, reverse=false)
+
     if "-tb" in opts:
         print_tb(bus_type)
     elif "-ch" in opts:
@@ -913,7 +1430,7 @@ def main():
         print_md_tables()
         #print_bf()
     else:
-        print_bus_wrapper(bus_type)
+        print_bus_wrapper(bus_type, is_dft="-dft" in opts)
   
 if __name__ == '__main__':
-   main()
+    main()
